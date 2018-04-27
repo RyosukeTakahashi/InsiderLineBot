@@ -1,0 +1,5 @@
+x,y,width, height, message_type, data
+0, 0, 1250, 843, "message", "住所変更"
+1250, 0, 1250, 843, "uri", "http://www.city.tsukuba.lg.jp/index.html"
+0, 843, 1250, 843, "postback", "data1=from_richmenu&data2=as_postback"
+1250, 843, 1250, 843, "postback", ["data3=from_richmenu_with&data4=message_text", "ポストバックのメッセージ"]

@@ -76,6 +76,7 @@ webhook url をLineダッシュボードで設定して、
 ## IBM Cloud へのPush
 
 最初からGithubからのCIを設定した方がいい。
+
 デフォルト設定でToolchainを作り、Git部分をGithubに変える(Existing repositoryを使う設定)。
 SlackによるDeploy通知もも作る。
 

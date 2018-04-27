@@ -106,7 +106,11 @@ elif os.path.isfile('vcap-local.json'):
         client = Cloudant(user, password, url=url, connect=True)
         db = client.create_database(DB_NAME, throw_on_exists=False)
         # using line-simulator
-        line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN, "http://localhost:8080")
+        # line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN, "https://localhost:8080")
+
+        # using ngrok
+        line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
+
 AREA_COUNT = {
     '天久保': 4,
     '桜': 3,

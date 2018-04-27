@@ -62,21 +62,22 @@ sh set-env.sh
 }
 ```
 
+### .gitignore を忘れない。
+
 ## 実行方法
 
-
 ngrokを使う場合,
-ngrok.exeを起動して、`ngrok.exe http 8000`
+ngrok.exeを起動して、
+Win:`ngrok.exe http 8000`
+Mac:`./ngrok http 8000`
 webhook url をLineダッシュボードで設定して、
 - https://xxxxxxxx.ngrok.io/line/callback
 
 `python app.py`
 
-
 ## IBM Cloud へのPush
 
 最初からGithubからのCIを設定した方がいい。
-
 デフォルト設定でToolchainを作り、Git部分をGithubに変える(Existing repositoryを使う設定)。
 SlackによるDeploy通知もも作る。
 

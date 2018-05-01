@@ -6,8 +6,13 @@
     ],
     "total_rounds": 6,
     "rounds_ended": [],
-    "insider_order": [
-      "U0a028f903127e2178bd789b4b4046ba7"
+    "insider_order": [],
+    "master_order": [],
+    "rounds_info": [
+      {
+        "insider": "U0a028f903127e2178bd789b4b4046ba7",
+        "master": "U0a028f903127e2178bd789b4b4046ba7"
+      }
     ],
     "words": [
       "\u30b8\u30a7\u30c3\u30c8\u30b3\u30fc\u30b9\u30bf\u30fc",

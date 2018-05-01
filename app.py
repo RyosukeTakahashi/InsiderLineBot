@@ -4,7 +4,10 @@ import os
 import sys
 from dotenv import load_dotenv
 import atexit
-import pprint
+import random
+import time
+import datetime
+import sched
 import re
 import json
 import requests
@@ -78,9 +81,11 @@ port = int(os.getenv('PORT', 8000))
 # 8080 on bluemix
 print("port is {}".format(port))
 
+
 @app.route('/')
 def home():
     return render_template('index.html')
+
 
 @app.route('/api/visitors', methods=['POST'])
 def put_visitor():
@@ -117,26 +122,17 @@ def callback():
 
     for event in events:
 
-        # print("showing event")
-        # pprint.pprint(event)
-        # print("")
-
         if isinstance(event, MessageEvent):
 
             if isinstance(event.message, TextMessage):
 
                 text = event.message.text
 
-                if text == 's':
-
+                if text in ['s', 'す']:
                     line_bot_api.reply_message(
                         event.reply_token,
                         get_participation_button()
                     )
-
-                if text == '参加する':
-                    print("参加表明がありました。")
-                    print(event.source.user_id)
 
                 if text == "rm":
                     get_richmenu()
@@ -151,31 +147,124 @@ def callback():
 
             data_str = event.postback.data
             data_dict = dict(urlparse.parse_qsl(data_str))
+            # you can only use postbackevent for after button action because of below
+            room_id = data_dict['room_id']
+            room_json = open('rooms.json', 'r')
+            rooms_dict = json.load(room_json)
+            room = rooms_dict[room_id]
+            room_json.close()
             try:
                 next = data_dict['next']
             except:
                 next = ''
 
             if next == 'get-participation':
-                room_id = data_dict['room_id']
-                print("次の参加表明者を待っています")
-                rooms_dict = json.load(open('rooms.json', 'r'))
-                rooms_dict[room_id]['members'].append(event.source.user_id)
+                room['members'].append(event.source.user_id)
                 json.dump(rooms_dict, open('rooms.json', 'w'), indent=2)
 
             if next == 'close':
-                room_id = data_dict['room_id']
-                rooms_dict = json.load(open('rooms.json', 'r'))
-                members = rooms_dict[room_id]['members']
-                for member in members:
-                    line_bot_api.push_message(
-                        member,
-                        TextSendMessage(text=f"ゲームID{room_id}に参加します")
+                members = room['members']
+                rounds = int(room['total_rounds'])
+                line_bot_api.multicast(
+                    members,
+                    [TextSendMessage(text=f"ゲームID{room_id}に参加します"),
+                     TextSendMessage(text=f"全部で{rounds}ラウンドです。")]
+                )
+
+                single_round_intro(members, room, room_id, rooms_dict)
+
+            if next == 'start':
+                round_info = room['rounds_info']
+                now = datetime.datetime.now()
+
+                master = round_info[-1]['master']
+                nth_round = len(round_info)
+                line_bot_api.multicast(room['members'],
+                                       [TextSendMessage(text='スタートしました'),
+                                        TextSendMessage(text='各自の役割を遂行してください。')]
+                                       )
+                # round_info[-1]['start_time'] = now.strftime('%Y/%m/%d %H/%M%s')
+                # round_info[-1]['end_time'] = now + datetime.timedelta(seconds=5).strftime('%Y/%m/%d %H/%M%s')
+                end_time = now + datetime.timedelta(seconds=5)
+
+
+                line_bot_api.push_message(
+                    master,
+                    get_end_button(room_id, nth_round)
+                )
+
+                s = sched.scheduler(time.time, time.sleep)
+                def send_remaining_time(passed_time):
+                    line_bot_api.multicast(
+                        members,
+                        TextSendMessage(text=f'あと{300-passed_time}秒です。')
                     )
+                def schedule_remind_time(remind_times):
+
+                    for remind_time in remind_times:
+                        s.enter(remind_times, 1, send_remaining_time, argument=remind_time)
+                    s.run()
+                    print(time.time())
+
+                schedule_remind_time([3,6])
+
+                line_bot_api.push_message(
+                    master,
+                    TextSendMessage(text="test")
+                )
+
 
             post_postback_to_db(event)
 
     return 'OK'
+
+
+def single_round_intro(members, room, room_id, rooms_dict):
+    insider = random.choice(members)
+    members.remove(insider)
+    master = random.choice(members)
+    members.remove(master)
+    commons = members
+    room['rounds_info'].append({
+        'insider': insider,
+        'master': master
+    })
+    rooms_dict[room_id] = room
+    with open('rooms.json', 'w') as room_json:
+        json.dump(rooms_dict, room_json, indent=2)
+
+    nth_round = len(room['rounds_info'])
+    word = room["words"][nth_round-1]
+    line_bot_api.multicast(
+        members,
+        [TextSendMessage(text=f"それでは、第{nth_round}ラウンドを開始します。")]
+    )
+
+
+    line_bot_api.multicast(
+        commons,
+        [TextSendMessage(text='あなたは庶民です。'),
+         TextSendMessage(text=f'お題を当てるためにマスターに質問をしていきましょう。'),
+         TextSendMessage(text='なお、「はい」「いいえ」「わからない」でマスターが答えられる質問にしましょう'),
+         TextSendMessage(text='それでは、マスターからの指示を待ちましょう')]
+
+    )
+    line_bot_api.push_message(
+        insider,
+        [TextSendMessage(text='インサイダーはあなたです。'),
+         TextSendMessage(text=f'お題は"{word}"です。（お題はあなたとインサイダー以外には送られていません。）'),
+         TextSendMessage(text='庶民のふりをしつつ、庶民を裏で操り、お題を当てさせてあげましょう。'),
+         TextSendMessage(text='それでは、マスターからの指示を待ちましょう')]
+
+    )
+    line_bot_api.push_message(
+        master,
+        [TextSendMessage(text='マスターはあなたです。マスターであることを皆に伝えてください。'),
+         TextSendMessage(text=f'お題は"{word}"です。（お題はあなたとマスター以外には送られていません。）'),
+         TextSendMessage(text=f'お題に関しての庶民からの質問に「はい」「いいえ」「わからない」の３択で答えていきましょう。'),
+         TextSendMessage(text=f'お題の"{word}"を当てられたら「正解です」と答え、「正解が出ました」ボタンを押しましょう'),
+         get_start_button(room_id, len(room['rounds_info']))]
+    )
 
 
 #######################################
@@ -183,7 +272,6 @@ def callback():
 # Below are templates functions
 
 def get_participation_button():
-
     rooms_json = open('rooms.json', 'r')
     rooms_dict = json.load(rooms_json)
 
@@ -193,14 +281,12 @@ def get_participation_button():
     new_room_id = room_count + 1
 
     rooms_dict[str(new_room_id)] = {
-        "members": [
-            "U0a028f903127e2178bd789b4b4046ba7"
-        ],
+        "members": [],
         "total_rounds": 6,
         "rounds_ended": [],
-        "insider_order": [
-            "U0a028f903127e2178bd789b4b4046ba7"
-        ],
+        "insider_order": [],
+        "master_order": [],
+        "rounds_info": [],
         "words": [
             "ジェットコースター",
             "インク",
@@ -243,89 +329,51 @@ def get_participation_button():
 
     return buttons_template_message
 
-def choose_master():
-    pass
 
+def get_start_button(room_id, nth_round):
+    buttons_template_message = TemplateSendMessage(
+        alt_text='Buttons template',
+        template=ButtonsTemplate(
+            # thumbnail_image_url='https://example.com/image.jpg',
+            title='各自が役割を確認できたらスタートを押してください',
+            text='このボタンはマスターのあなたにしか見えていません',
+            actions=[
+                PostbackTemplateAction(
+                    label='スタート',
+                    text='スタート',
+                    data=f'room_id={room_id}&next=start'
+                )
+            ]
+        )
+    )
+
+    return buttons_template_message
+
+
+def get_end_button(room_id, nth_round):
+    buttons_template_message = TemplateSendMessage(
+        alt_text='Buttons template',
+        template=ButtonsTemplate(
+            # thumbnail_image_url='https://example.com/image.jpg',
+            title='正解が出たら押してください',
+            text='このボタンはマスターのあなたにしか見えていません',
+            actions=[
+                PostbackTemplateAction(
+                    label='正解が出ました',
+                    text='正解が出ました',
+                    data=f'room_id={room_id}&next=answered'
+                )
+            ]
+        )
+    )
+
+    return buttons_template_message
 
 # get template function end
 
 ###############################################
 
 # Below are api using function
-
-
-def get_geocode(address):
-    params = {
-        'address': 'つくば市 ' + address,
-        'key': GEOCODING_APIKEY
-    }
-    s = requests.Session()
-    r = s.get(GEOCODING_ENDPOINT, params=params)
-    json_res = r.json()
-    location = json_res['results'][0]['geometry']['location']
-
-    location_str = str(location['lat']) + ',' + str(location['lng'])
-
-    return location_str
-
-
-def get_places_by_nearby_search(budget, transportation, location_geometry):
-    radius = ''
-    print(transportation)
-    if transportation == '徒歩':
-        radius = '700'
-    elif transportation == '自転車':
-        radius = '2000'
-    elif transportation == '車':
-        radius = '8000'
-
-    params = {
-        'key': PLACES_APIKEY,
-        'keyword': 'レストラン OR カフェ OR 定食 OR バー',
-        'location': location_geometry,
-        'radius': radius,
-        # 'maxprice': budget,
-        # 'minprice': str(int(budget) - 1),
-        'opennow': 'true',
-        'rankby': 'prominence',
-        'language': 'ja'
-    }
-    s = requests.Session()
-
-    r = s.get(PLACES_NEARBYSEARCH_ENDPOINT, params=params)
-    r.encoding = r.apparent_encoding
-    json_result = r.json()
-    # pprint.pprint(json_result)
-    with open('place.json', mode='w', encoding='utf-8') as f:
-        f.write(json.dumps(json_result, sort_keys=True, ensure_ascii=False, indent=2))
-        print(json.dumps(json_result, sort_keys=True, ensure_ascii=False, indent=2))  # .encode('utf-8'))
-
-    return json_result
-
-
-def get_place_detail(place_id):
-    params = {
-        'key': PLACES_APIKEY,
-        'placeid': place_id,
-        'language': 'ja'
-    }
-
-    s = requests.Session()
-    r = s.get(PLACES_DETAIL_ENDPOINT, params=params)
-    json_result = r.json()
-
-    return json_result
-
-
-def get_place_photo_url(photo_ref):
-    params = {
-        'key': PLACES_APIKEY,
-        'photoreference': photo_ref,
-        'maxwidth': '400'
-    }
-    url = PLACES_PHOTO_ENDPOINT + '?' + urlparse.urlencode(params)
-
-    return url
 
 
 def post_text_to_db(event):
@@ -369,77 +417,7 @@ def post_postback_to_db(event):
 
 # below are richmenu function
 #####################################
-def get_richmenu():
 
-    rmm = RichMenuManager(CHANNEL_ACCESS_TOKEN)
-
-    rm_name_and_id = get_rm_name_and_id(rmm)
-    menu_name_to_get = "Menu1"
-
-    if menu_name_to_get in rm_name_and_id.keys():
-        richmenu_id = rm_name_and_id[menu_name_to_get]
-        print("found {}".format(menu_name_to_get))
-
-    else:
-        rm = RichMenu(name="Menu1", chat_bar_text="問い合わせカテゴリー", selected=True)
-        rm.add_area(0, 0, 1250, 843, "message", "住所変更")
-        rm.add_area(1250, 0, 1250, 843, "uri", "http://www.city.tsukuba.lg.jp/index.html")
-        rm.add_area(0, 843, 1250, 843, "postback", "data1=from_richmenu&data2=as_postback")
-        rm.add_area(1250, 843, 1250, 843, "postback", ["data3=from_richmenu_with&data4=message_text", "ポストバックのメッセージ"])
-
-        # Register
-        res = rmm.register(rm, "./menu_images/4x2.png")
-        richmenu_id = res["richMenuId"]
-        print("Registered as " + richmenu_id)
-
-    # Apply to user
-    user_id = "U0a028f903127e2178bd789b4b4046ba7"
-    rmm.apply(user_id, richmenu_id)
-
-    # Check
-    res = rmm.get_applied_menu(user_id)
-    print(user_id  + ":" + res["richMenuId"])
-
-
-def get_richmenu2():
-
-    rmm = RichMenuManager(CHANNEL_ACCESS_TOKEN)
-
-    rm_name_and_id = get_rm_name_and_id(rmm)
-    menu_name_to_get = "Menu2"
-
-    if menu_name_to_get in rm_name_and_id.keys():
-        richmenu_id = rm_name_and_id[menu_name_to_get]
-        print("found {}".format(menu_name_to_get))
-
-    else:
-        rm = RichMenu(name=menu_name_to_get, chat_bar_text="住所変更", size_full=False)
-        rm.add_area(0, 0, 625, 421, "message", "転出")
-        rm.add_area(625, 0, 625, 421, "message", "転入（国内）")
-        rm.add_area(1875, 422, 625, 421, "message", "戻る")
-        rm.add_area(1250, 422, 625, 421, "message", "delete richmenu")
-
-        # Register
-        res = rmm.register(rm, "./menu_images/4x2.png")
-        richmenu_id = res["richMenuId"]
-        print("Registered as " + richmenu_id)
-
-    # Apply to user
-    user_id = "U0a028f903127e2178bd789b4b4046ba7"
-    rmm.apply(user_id, richmenu_id)
-
-
-def get_rm_name_and_id(rmm):
-
-    rm_list = rmm.get_list()['richmenus']
-    rm_name_and_id = {}
-    rm_name_list = [rm['name'] for rm in rm_list]
-    rm_richMenuId_list = [rm['richMenuId'] for rm in rm_list]
-
-    for name, richMenuId in zip(rm_name_list, rm_richMenuId_list):
-        rm_name_and_id[name] = richMenuId
-
-    return rm_name_and_id
 
 #####################################
 
@@ -450,8 +428,14 @@ def get_rm_name_and_id(rmm):
 def get_room_count(rooms_json):
     return len(rooms_json.keys())
 
+
 def get_postback_data_dict(data):
     return dict(urlparse.parse_qsl(data))
+
+
+def get_list_without_insider(members, insider):
+    members.remove(insider)
+    return members
 
 
 #####################################

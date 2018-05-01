@@ -157,12 +157,21 @@ def callback():
                 next = ''
 
             if next == 'get-participation':
-
                 room_id = data_dict['room_id']
                 print("次の参加表明者を待っています")
                 rooms_dict = json.load(open('rooms.json', 'r'))
                 rooms_dict[room_id]['members'].append(event.source.user_id)
                 json.dump(rooms_dict, open('rooms.json', 'w'), indent=2)
+
+            if next == 'close':
+                room_id = data_dict['room_id']
+                rooms_dict = json.load(open('rooms.json', 'r'))
+                members = rooms_dict[room_id]['members']
+                for member in members:
+                    line_bot_api.push_message(
+                        member,
+                        TextSendMessage(text=f"ゲームID{room_id}に参加します")
+                    )
 
             post_postback_to_db(event)
 
@@ -220,8 +229,13 @@ def get_participation_button():
                 ),
                 PostbackTemplateAction(
                     label='参加を締め切る',
-                    text='message text',
-                    data='close'
+                    text='参加を締め切る',
+                    data=urlparse.urlencode(
+                        {
+                            'room_id': new_room_id,
+                            'next': 'close'
+                        }
+                    )
                 )
             ]
         )
@@ -229,168 +243,8 @@ def get_participation_button():
 
     return buttons_template_message
 
-
-def get_area_postback_template_action(area, i):
-    data_dict = {
-        'area': area + str(i),
-        'next': 'budget'
-    }
-
-    return PostbackTemplateAction(
-        label='{}丁目'.format(str(i)),
-        text='今は{}の{}丁目'.format(area, str(i)),
-        data=urlparse.urlencode(data_dict)
-    )
-
-
-def get_budget_buttons_template_message(data_dict):
-    actions = [get_budget_postback_template_action(data_dict, i, budget_range)
-               for i, budget_range in enumerate(['多分、~1200未満', '2000円近く覚悟', '3000円かそれ以上'])]
-
-    buttons_template_message = TemplateSendMessage(
-        alt_text='予算を決めるボタンが表示されています',
-        template=ButtonsTemplate(
-            title='予算はどの程度ですか？',
-            text='お選びください',
-            actions=actions
-        )
-    )
-
-    return buttons_template_message
-
-
-def get_budget_postback_template_action(data_dict, i, budget_range):
-    data_dict['budget'] = i + 1
-    data_dict['next'] = 'transportation'
-    data = urlparse.urlencode(data_dict)
-
-    return PostbackTemplateAction(
-        label=budget_range,
-        text="{}なところですね。".format(budget_range),
-        data=data
-    )
-
-
-def get_transportation_buttons_template_message(data_dict):
-    actions = [get_transportation_postback_template_action(data_dict, transportation)
-               for transportation in ['徒歩', '自転車', '車']]
-
-    buttons_template_message = TemplateSendMessage(
-        alt_text='移動手段を決めるボタンが表示されています',
-        template=ButtonsTemplate(
-            title='移動手段は？',
-            text='お選びください',
-            actions=actions
-        )
-    )
-
-    return buttons_template_message
-
-
-def get_transportation_postback_template_action(data_dict, transportation):
-    data_dict['next'] = 'show-result'
-    data_dict['transportation'] = transportation
-    data_dict['nth-result'] = 0
-    data = urlparse.urlencode(data_dict)
-
-    return PostbackTemplateAction(
-        label=transportation,
-        text='{}で行ける範囲で。\n指定された条件で、今現在営業中の店をお探しします。\n検索にちょっとだけ時間を頂きます。'.format(transportation),
-        data=data
-    )
-
-
-def get_spot_carousels(places5):
-    columns = [get_carousel_column_template(place) for place in places5]
-    # template.py のCarouselTemplate(Base)をCarouselTemplate(Template)に変えたほうがいいような
-    carousel_template_message = TemplateSendMessage(
-        alt_text='候補地が表示されています。',
-        template=CarouselTemplate(columns=columns)
-    )
-
-    return carousel_template_message
-
-
-def get_carousel_column_template(place):
-    # area = re.sub('日本、[\s\S]?(〒\d{3}-\d{4}[\s\S]?)?茨城県つくば市', '', place['formatted_address'])
-    area = re.sub('つくば市', '', place['vicinity'])
-
-    gmap_url = get_place_detail(place['place_id'])['result']['url']
-
-    try:
-        photo_url = get_place_photo_url(place['photos'][0]['photo_reference'])
-    except:
-        photo_url = 'https://developers.google.com/maps/documentation/static-maps/images/quota.png'
-
-    # 住所が長すぎると予算を表示するスペースが無くなる問題の対処。
-    line_change = '\n'
-    if len(area) > 17:
-        line_change = ''
-
-    if 'price_level' in place.keys():
-        if place['price_level'] is 1:
-            price = '~1200円'
-        if place['price_level'] is 2:
-            price = '1200円~'
-        if place['price_level'] is 3:
-            price = '3000円~'
-        address_template = '住所: {}\nレビュー: {} {}予算: {}'
-
-    else:
-        price = 0
-        address_template = '住所: {}\nレビュー: {}'
-
-    if 'rating' not in place.keys():
-        rating = 'なし'
-    else:
-        rating = str(place['rating'])
-
-    address = address_template.format(
-        area, str(rating),
-        line_change, price
-    )
-
-    carousel_column = CarouselColumn(
-        thumbnail_image_url=photo_url,
-        title=place['name'],
-        text=address,
-        actions=[
-            URITemplateAction(
-                label='地図とレビューを見る',
-                uri=gmap_url
-            ),
-            PostbackTemplateAction(
-                label='電話番号を表示する',
-                data='action=detail_phone&id={}'.format(place['place_id'])
-            )
-        ]
-    )
-
-    return carousel_column
-
-
-def get_additional_search_confirm_template(data_dict):
-    data_dict['nth-result'] = int(data_dict['nth-result']) + 1
-
-    confirm_template_message = TemplateSendMessage(
-        alt_text='追加の5件を表示しますか？',
-        template=ConfirmTemplate(
-            text='追加の5件を表示しますか？',
-            actions=[
-                PostbackTemplateAction(
-                    label='表示する',
-                    text='表示する',
-                    data=urlparse.urlencode(data_dict)
-                ),
-                MessageTemplateAction(
-                    label='終了する',
-                    text='終了する'
-                )
-            ]
-        )
-    )
-
-    return confirm_template_message
+def choose_master():
+    pass
 
 
 # get template function end

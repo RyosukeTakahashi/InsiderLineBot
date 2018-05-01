@@ -1,27 +1,3 @@
-# test slack pushing
-# 大カテゴリー、住所変更
-# 転出、転入（国内）、転入（海外）、転居
-
-# 案内マニュアル」フォルダ内にある、、、
-# todo「5-2. 住所変更ＦＡＱ」の「P49 A 転出（国内・海外）」～「P56 D 転居」
-
-# 以下は↑にともなって発生しうるマイナンバー関係手続き
-# todo 「通知カードの紛失に関連する手続」及び「通知カードの表面記載事項変更手続」
-#↓3つ目の参照先
-#  ●もう怖くない！マイナ係窓口業務チェックポイント
-# 　　　シート名 「通知カード再交付申請受付」P２
-# 　　　　　　　 「個人番号変更受付」P３
-#
-# 　●マイナンバー取扱事務早見表
-# 　　　シート名 「H28.7.1～」
-# 　　　　事務欄　個人番号・・・・指定請求申請
-# 　　　　　　　　通知カード・・・再交付申請，紛失届，表面記載事項変更届（外国人含）
-#
-#  ●(通カ・個カ・電子)マイナンバー事務早見表
-# 　　　シート名 「通知カード」通知カードに関する事務早見表
-# 　　　　項番号 「１－１」～「２－３」，「６－１」～「６－３」
-
-# -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 from cloudant import Cloudant
 import os
@@ -46,8 +22,19 @@ from richmenu import RichMenu, RichMenuManager
 
 cf_deployment_tracker.track()
 
-# tested in
-# ngrok http 8000
+if os.path.isfile('.env') or os.path.isfile('env'):
+    print('found .env. So it should be a local environment.')
+    ENV = load_dotenv('.env')
+    if ENV is None:
+        ENV = load_dotenv('env')
+else:
+    print('Cannot find .env. So it should be on the cloud.')
+
+CHANNEL_SECRET = os.getenv('CHANNEL_SECRET')
+CHANNEL_ACCESS_TOKEN = os.getenv('CHANNEL_ACCESS_TOKEN')
+PLACES_APIKEY = os.getenv('PLACES_APIKEY')
+GEOCODING_APIKEY = os.getenv('GEOCODING_APIKEY')
+DB_NAME = os.getenv('DB_NAME')
 
 CHATBOT_ENDPOINT = 'https://chatbot-api.userlocal.jp/api/chat'
 SIMPLE_WIKIPEDIA_API = 'http://wikipedia.simpleapi.net/api'
@@ -57,59 +44,33 @@ PLACES_DETAIL_ENDPOINT = 'https://maps.googleapis.com/maps/api/place/details/jso
 PLACES_PHOTO_ENDPOINT = 'https://maps.googleapis.com/maps/api/place/photo'
 GEOCODING_ENDPOINT = 'https://maps.googleapis.com/maps/api/geocode/json'
 
-# get CHANNEL_SECRET and CHANNEL_ACCESS_TOKEN from your environment variable
+if CHANNEL_SECRET is None:
+    print('Specify LINE_CHANNEL_SECRET as environment variable.')
+    sys.exit(1)
+if CHANNEL_ACCESS_TOKEN is None:
+    print('Specify LINE_CHANNEL_ACCESS_TOKEN as environment variable.')
+    sys.exit(1)
 
-if os.path.isfile('.env') or os.path.isfile('env'):
-    print('found .env. So it should be a local environment.')
-    ENV = load_dotenv('.env')
-    if ENV is None:
-        ENV = load_dotenv('env')
-    CHANNEL_SECRET = os.environ.get('CHANNEL_SECRET')
-    CHANNEL_ACCESS_TOKEN = os.environ.get('CHANNEL_ACCESS_TOKEN')
-    PLACES_APIKEY = os.environ.get('PLACES_APIKEY')
-    GEOCODING_APIKEY = os.environ.get('GEOCODING_APIKEY')
-    DB_NAME = os.environ.get('DB_NAME')
-
-
-# envの記述方法を書いておくべきかな
-else:
-    print('Cannot find .env. So it should be on the cloud.')
-    CHANNEL_SECRET = os.getenv('CHANNEL_SECRET')
-    CHANNEL_ACCESS_TOKEN = os.getenv('CHANNEL_ACCESS_TOKEN')
-    PLACES_APIKEY = os.getenv('PLACES_APIKEY')
-    GEOCODING_APIKEY = os.getenv('GEOCODING_APIKEY')
-    DB_NAME = os.getenv('DB_NAME')
-
-client = None
-db = None
+parser = WebhookParser(CHANNEL_SECRET)
+line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 
 if 'VCAP_SERVICES' in os.environ:
     vcap = json.loads(os.getenv('VCAP_SERVICES'))
     print('Found VCAP_SERVICES')
     if 'cloudantNoSQLDB' in vcap:
         creds = vcap['cloudantNoSQLDB'][0]['credentials']
-        user = creds['username']
-        password = creds['password']
-        url = 'https://' + creds['host']
-        client = Cloudant(user, password, url=url, connect=True)
-        db = client.create_database(DB_NAME, throw_on_exists=False)
-        line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 
 elif os.path.isfile('vcap-local.json'):
     with open('vcap-local.json') as f:
         vcap = json.load(f)
         print('Found local VCAP_SERVICES')
         creds = vcap['services']['cloudantNoSQLDB'][0]['credentials']
-        user = creds['username']
-        password = creds['password']
-        url = 'https://' + creds['host']
-        client = Cloudant(user, password, url=url, connect=True)
-        db = client.create_database(DB_NAME, throw_on_exists=False)
-        # using line-simulator
-        # line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN, "https://localhost:8080")
 
-        # using ngrok
-        line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
+user = creds['username']
+password = creds['password']
+url = 'https://' + creds['host']
+client = Cloudant(user, password, url=url, connect=True)
+db = client.create_database(DB_NAME, throw_on_exists=False)
 
 AREA_COUNT = {
     '天久保': 4,
@@ -118,16 +79,6 @@ AREA_COUNT = {
     '吾妻': 4,
     '竹園': 4,
 }
-
-if CHANNEL_SECRET is None:
-    print('Specify LINE_CHANNEL_SECRET as environment variable.')
-    sys.exit(1)
-if CHANNEL_ACCESS_TOKEN is None:
-    print('Specify LINE_CHANNEL_ACCESS_TOKEN as environment variable.')
-    sys.exit(1)
-
-
-parser = WebhookParser(CHANNEL_SECRET)
 
 app = Flask(__name__)
 
@@ -139,16 +90,6 @@ print("port is {}".format(port))
 @app.route('/')
 def home():
     return render_template('index.html')
-
-
-# @app.route('/api/visitors', methods=['GET'])
-# def get_visitor():
-#     if client:
-#         return jsonify(list(map(lambda doc: doc['na me'], db)))
-#     else:
-#         print('No database')
-#         return jsonify([])
-
 
 @app.route('/api/visitors', methods=['POST'])
 def put_visitor():
@@ -195,27 +136,9 @@ def callback():
 
                 text = event.message.text
 
-                if text in AREA_COUNT.keys():
-                    line_bot_api.reply_message(
-                        event.reply_token,
-                        get_area_buttons_template_message(text)
-                    )
-
                 if text == "staff":
                     get_richmenu()
 
-                if text == "住所変更":
-                    line_bot_api.reply_message(
-                        event.reply_token,
-                        [
-                            TextSendMessage(text="住所変更のFAQを表示します。"),
-                            ImageSendMessage(original_content_url="https://i.imgur.com/8uLNKdb.png", preview_image_url="https://i.imgur.com/8uLNKdbb.png")
-                        ]
-                    )
-                    get_richmenu2()
-
-                if text == "戻る":
-                    get_richmenu()
 
                 if text == "delete richmenu":
                     rmm = RichMenuManager(CHANNEL_ACCESS_TOKEN)
@@ -223,16 +146,6 @@ def callback():
 
 
                 post_text_to_db(event)
-
-            # if isinstance(event.message, LocationMessage):
-
-            # latitude = event.message.latitude
-            # longtitude = event.message.longitude
-
-            # line_bot_api.reply_message(
-            #     event.reply_token,
-            #     get_budget_buttons_template_message()
-            # )
 
         if isinstance(event, PostbackEvent):
 
@@ -257,50 +170,7 @@ def callback():
                     get_transportation_buttons_template_message(data_dict)
                 )
 
-            elif next == "show-result":
 
-                print("showing result")
-                places = get_places_by_nearby_search(
-                    data_dict['budget'],
-                    data_dict['transportation'],
-                    get_geocode(data_dict['area'])
-                )["results"]
-
-                result_count = len(places)
-
-                nth_result = data_dict['nth-result']
-
-                start_index = int(nth_result) * 5
-                end_index = 5 + int(nth_result) * 5
-
-                second_message = get_additional_search_confirm_template(data_dict)
-
-                if end_index >= result_count:
-                    end_index = result_count
-                    second_message = TextSendMessage(
-                        text='指定された条件でこれ以上の候補は見つかりませんでした。\n条件を変えて検索する場合は、下のボタンから現在地を入力してください。'
-                    )
-                    if end_index % 5 is not 0:
-                        start_index = end_index - (end_index % 5)
-
-                line_bot_api.reply_message(
-                    event.reply_token,
-                    [get_spot_carousels(places[start_index:end_index]),
-                     second_message]
-                )
-
-            if "detail" in data_str:
-                place_id = dict(urlparse.parse_qsl(data_str))['id']
-                place_detail = get_place_detail(place_id)['result']
-
-                messages = []
-                if 'phone' in data_str:
-                    messages = [TextSendMessage(text=place_detail['formatted_phone_number'])]
-
-                line_bot_api.reply_message(
-                    event.reply_token,
-                    messages
-                )
             post_postback_to_db(event)
 
     return 'OK'
@@ -610,6 +480,8 @@ def post_postback_to_db(event):
 
 #####################################
 
+# below are richmenu function
+#####################################
 def get_richmenu():
 
     rmm = RichMenuManager(CHANNEL_ACCESS_TOKEN)
@@ -684,6 +556,8 @@ def get_rm_name_and_id(rmm):
 
 #####################################
 
+# below are you utility functions
+#####################################
 
 def get_postback_data_dict(data):
     return dict(urlparse.parse_qsl(data))

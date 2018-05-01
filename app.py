@@ -72,20 +72,11 @@ url = 'https://' + creds['host']
 client = Cloudant(user, password, url=url, connect=True)
 db = client.create_database(DB_NAME, throw_on_exists=False)
 
-AREA_COUNT = {
-    '天久保': 4,
-    '桜': 3,
-    '春日': 4,
-    '吾妻': 4,
-    '竹園': 4,
-}
-
 app = Flask(__name__)
 
 port = int(os.getenv('PORT', 8000))
 # 8080 on bluemix
 print("port is {}".format(port))
-
 
 @app.route('/')
 def home():
@@ -126,9 +117,9 @@ def callback():
 
     for event in events:
 
-        print("showing event")
-        pprint.pprint(event)
-        print("")
+        # print("showing event")
+        # pprint.pprint(event)
+        # print("")
 
         if isinstance(event, MessageEvent):
 
@@ -136,21 +127,23 @@ def callback():
 
                 text = event.message.text
 
-                if text == 'start':
+                if text == 's':
 
                     line_bot_api.reply_message(
                         event.reply_token,
-
+                        get_participation_button()
                     )
+
+                if text == '参加する':
+                    print("参加表明がありました。")
+                    print(event.source.user_id)
 
                 if text == "rm":
                     get_richmenu()
 
-
-                if text == "delete richmenu":
+                if text == "delete rm":
                     rmm = RichMenuManager(CHANNEL_ACCESS_TOKEN)
                     rmm.remove_all()
-
 
                 post_text_to_db(event)
 
@@ -163,20 +156,13 @@ def callback():
             except:
                 next = ''
 
-            if next == 'budget':
+            if next == 'get-participation':
 
-                line_bot_api.reply_message(
-                    event.reply_token,
-                    get_budget_buttons_template_message(data_dict)
-                )
-
-            elif next == 'transportation':
-
-                line_bot_api.reply_message(
-                    event.reply_token,
-                    get_transportation_buttons_template_message(data_dict)
-                )
-
+                room_id = data_dict['room_id']
+                print("次の参加表明者を待っています")
+                rooms_dict = json.load(open('rooms.json', 'r'))
+                rooms_dict[room_id]['members'].append(event.source.user_id)
+                json.dump(rooms_dict, open('rooms.json', 'w'), indent=2)
 
             post_postback_to_db(event)
 
@@ -189,43 +175,55 @@ def callback():
 
 def get_participation_button():
 
+    rooms_json = open('rooms.json', 'r')
+    rooms_dict = json.load(rooms_json)
+
+    rooms_dict.pop('1', None)  # only while testing
+
+    room_count = get_room_count(rooms_dict)
+    new_room_id = room_count + 1
+
+    rooms_dict[str(new_room_id)] = {
+        "members": [
+            "U0a028f903127e2178bd789b4b4046ba7"
+        ],
+        "total_rounds": 6,
+        "rounds_ended": [],
+        "insider_order": [
+            "U0a028f903127e2178bd789b4b4046ba7"
+        ],
+        "words": [
+            "ジェットコースター",
+            "インク",
+            "アイポッド",
+            "メール",
+            "ベルト",
+            "紅茶"
+        ]
+    }
+    json.dump(rooms_dict, open('rooms.json', 'w'), indent=2)
+
+    data_dict = {'room_id': new_room_id,
+                 'next': 'get-participation'}
+    data = urlparse.urlencode(data_dict)
+
     buttons_template_message = TemplateSendMessage(
         alt_text='インサイダーゲームを開始します。参加者はボタンを押してください。',
         template=ButtonsTemplate(
-            title='インサイダーゲームを開始します',
+            title='インサイダーを開始します',
             text='参加者はボタンを押してください。',
             actions=[
                 PostbackTemplateAction(
-                    label='postback',
-                    text='postback text',
-                    data='action=buy&itemid=1'
+                    label='参加する',
+                    text='参加する',
+                    data=data
                 ),
-                MessageTemplateAction(
-                    label='message',
-                    text='message text'
-                ),
-                URITemplateAction(
-                    label='uri',
-                    uri='http://example.com/'
+                PostbackTemplateAction(
+                    label='参加を締め切る',
+                    text='message text',
+                    data='close'
                 )
             ]
-        )
-    )
-
-    return buttons_template_message
-
-
-def get_area_buttons_template_message(area):
-    chou_count = AREA_COUNT[area]
-
-    actions = [get_area_postback_template_action(area, i) for i in range(1, chou_count + 1)]
-
-    buttons_template_message = TemplateSendMessage(
-        alt_text='{}の何丁目にいますか？'.format(area),
-        template=ButtonsTemplate(
-            title='{}の何丁目にいますか？'.format(area),
-            text='お選びください',
-            actions=actions
         )
     )
 
@@ -593,6 +591,10 @@ def get_rm_name_and_id(rmm):
 
 # below are you utility functions
 #####################################
+
+
+def get_room_count(rooms_json):
+    return len(rooms_json.keys())
 
 def get_postback_data_dict(data):
     return dict(urlparse.parse_qsl(data))

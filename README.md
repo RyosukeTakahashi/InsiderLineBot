@@ -79,7 +79,8 @@ webhook url をLineダッシュボードで設定して、
 
 最初からGithubからのCIを設定した方がいい。
 デフォルト設定でToolchainを作り、Git部分をGithubに変える(Existing repositoryを使う設定)。
-SlackによるDeploy通知もも作る。
+Deploymentをトラックする設定にする。
+SlackによるDeploy通知も作る。
 
 ## その他必要なこと。
 

@@ -136,7 +136,14 @@ def callback():
 
                 text = event.message.text
 
-                if text == "staff":
+                if text == 'start':
+
+                    line_bot_api.reply_message(
+                        event.reply_token,
+
+                    )
+
+                if text == "rm":
                     get_richmenu()
 
 
@@ -179,6 +186,34 @@ def callback():
 #######################################
 
 # Below are templates functions
+
+def get_participation_button():
+
+    buttons_template_message = TemplateSendMessage(
+        alt_text='インサイダーゲームを開始します。参加者はボタンを押してください。',
+        template=ButtonsTemplate(
+            title='インサイダーゲームを開始します',
+            text='参加者はボタンを押してください。',
+            actions=[
+                PostbackTemplateAction(
+                    label='postback',
+                    text='postback text',
+                    data='action=buy&itemid=1'
+                ),
+                MessageTemplateAction(
+                    label='message',
+                    text='message text'
+                ),
+                URITemplateAction(
+                    label='uri',
+                    uri='http://example.com/'
+                )
+            ]
+        )
+    )
+
+    return buttons_template_message
+
 
 def get_area_buttons_template_message(area):
     chou_count = AREA_COUNT[area]

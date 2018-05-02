@@ -1,8 +1,7 @@
 {
   "1": {
     "members": [
-      "U0a028f903127e2178bd789b4b4046ba7",
-      "U0a028f903127e2178bd789b4b4046ba7"
+      "Ueca979c9b9ccf1cc402144f478c88671"
     ],
     "total_rounds": 6,
     "rounds_ended": [],
@@ -10,8 +9,9 @@
     "master_order": [],
     "rounds_info": [
       {
-        "insider": "U0a028f903127e2178bd789b4b4046ba7",
-        "master": "U0a028f903127e2178bd789b4b4046ba7"
+        "insider": "U3177975bb02189fcceb5e14d73001b3e",
+        "master": "U0a028f903127e2178bd789b4b4046ba7",
+        "answered": true
       }
     ],
     "words": [

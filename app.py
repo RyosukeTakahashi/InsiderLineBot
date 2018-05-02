@@ -7,6 +7,7 @@ import atexit
 import random
 import time
 import datetime
+import threading
 import sched
 import re
 import json
@@ -134,13 +135,6 @@ def callback():
                         get_participation_button()
                     )
 
-                if text == "rm":
-                    get_richmenu()
-
-                if text == "delete rm":
-                    rmm = RichMenuManager(CHANNEL_ACCESS_TOKEN)
-                    rmm.remove_all()
-
                 post_text_to_db(event)
 
         if isinstance(event, PostbackEvent):
@@ -174,8 +168,9 @@ def callback():
                 single_round_intro(members, room, room_id, rooms_dict)
 
             if next == 'start':
+                members = room['members']
                 round_info = room['rounds_info']
-                now = datetime.datetime.now()
+                # now = datetime.datetime.now()
 
                 master = round_info[-1]['master']
                 nth_round = len(round_info)
@@ -185,38 +180,63 @@ def callback():
                                        )
                 # round_info[-1]['start_time'] = now.strftime('%Y/%m/%d %H/%M%s')
                 # round_info[-1]['end_time'] = now + datetime.timedelta(seconds=5).strftime('%Y/%m/%d %H/%M%s')
-                end_time = now + datetime.timedelta(seconds=5)
-
+                # end_time = now + datetime.timedelta(seconds=5)
 
                 line_bot_api.push_message(
                     master,
                     get_end_button(room_id, nth_round)
                 )
 
+                is_answered = round_info[-1]['answered']
+
                 s = sched.scheduler(time.time, time.sleep)
-                def send_remaining_time(passed_time):
-                    line_bot_api.multicast(
-                        members,
-                        TextSendMessage(text=f'あと{300-passed_time}秒です。')
-                    )
-                def schedule_remind_time(remind_times):
+                reminder_timings = [0, 3, 8, 15]
 
-                    for remind_time in remind_times:
-                        s.enter(remind_times, 1, send_remaining_time, argument=remind_time)
-                    s.run()
-                    print(time.time())
+                # for i, timing in enumerate(reminder_timings):
+                #     t1 = threading.Thread(target=remind, args=(is_answered, members, timing, reminder_timings, i))
+                #     t1.start()
+                #     print(is_answered)
 
-                schedule_remind_time([3,6])
+                schedule_remind_time(reminder_timings, members, s, is_answered)
 
-                line_bot_api.push_message(
-                    master,
-                    TextSendMessage(text="test")
-                )
+            if next == 'answered':
+                room['rounds_info'][-1]["answered"] = True
+                rooms_dict[room_id] = room
+                with open('rooms.json', 'w') as room_json:
+                    json.dump(rooms_dict, room_json, indent=2)
 
 
             post_postback_to_db(event)
 
     return 'OK'
+
+
+def remind(is_answered, members, timing, reminder_timings, i):
+
+    t = threading.Timer(3, remind)
+    t.start()
+    if not is_answered:
+        line_bot_api.multicast(
+            members,
+            TextSendMessage(text=f'あと{300-timing}秒です。')
+        )
+
+    time.sleep(reminder_timings[i+1] - reminder_timings[i])
+
+
+def send_remaining_time(passed_time, members, is_answered):
+    print(is_answered)
+    if is_answered == False:
+        line_bot_api.multicast(
+            members,
+            TextSendMessage(text=f'あと{300-passed_time}秒です。')
+        )
+
+
+def schedule_remind_time(remind_times, members, s, is_answered):
+    for remind_time in remind_times:
+        s.enter(remind_time, 1, send_remaining_time, argument=(remind_time, members, is_answered))
+    s.run()
 
 
 def single_round_intro(members, room, room_id, rooms_dict):
@@ -227,7 +247,8 @@ def single_round_intro(members, room, room_id, rooms_dict):
     commons = members
     room['rounds_info'].append({
         'insider': insider,
-        'master': master
+        'master': master,
+        'answered': False
     })
     rooms_dict[room_id] = room
     with open('rooms.json', 'w') as room_json:

@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import atexit
 import random
 import time
+import copy
 import datetime
 import threading
 import sched
@@ -22,7 +23,6 @@ from linebot.models import (
     PostbackEvent, JoinEvent, TemplateSendMessage, CarouselTemplate, CarouselColumn,
     ButtonsTemplate, PostbackTemplateAction, MessageTemplateAction, URITemplateAction
 )
-from richmenu import RichMenu, RichMenuManager
 
 cf_deployment_tracker.track()
 
@@ -158,6 +158,7 @@ def callback():
 
             if next == 'close':
                 members = room['members']
+                members = list(set(members))
                 rounds = int(room['total_rounds'])
                 line_bot_api.multicast(
                     members,
@@ -187,24 +188,27 @@ def callback():
                     get_end_button(room_id, nth_round)
                 )
 
-                is_answered = round_info[-1]['answered']
+                reminder_timings = [0, 3, 8]
 
-                s = sched.scheduler(time.time, time.sleep)
-                reminder_timings = [0, 3, 8, 15]
+                # s = sched.scheduler(time.time, time.sleep)
+                # schedule_remind_time(reminder_timings, members, s, is_answered)
 
-                # for i, timing in enumerate(reminder_timings):
-                #     t1 = threading.Thread(target=remind, args=(is_answered, members, timing, reminder_timings, i))
-                #     t1.start()
-                #     print(is_answered)
-
-                schedule_remind_time(reminder_timings, members, s, is_answered)
+                for i, timing in enumerate(reminder_timings):
+                    # t1 = threading.Thread(target=remind, args=(is_answered, members, timing, reminder_timings, i))
+                    # t1.start()
+                    if not round_info[-1]['answered']:
+                        line_bot_api.multicast(
+                            members,
+                            TextSendMessage(text=f'あと{300-timing}秒です。')
+                        )
+                        print(round_info[-1]['answered'])
+                        time.sleep(reminder_timings[i+1] - reminder_timings[i])
 
             if next == 'answered':
                 room['rounds_info'][-1]["answered"] = True
                 rooms_dict[room_id] = room
                 with open('rooms.json', 'w') as room_json:
                     json.dump(rooms_dict, room_json, indent=2)
-
 
             post_postback_to_db(event)
 
@@ -240,11 +244,12 @@ def schedule_remind_time(remind_times, members, s, is_answered):
 
 
 def single_round_intro(members, room, room_id, rooms_dict):
-    insider = random.choice(members)
-    members.remove(insider)
-    master = random.choice(members)
-    members.remove(master)
-    commons = members
+    members_copy = copy.deepcopy(members)
+    insider = random.choice(members_copy)
+    members_copy.remove(insider)
+    master = random.choice(members_copy)
+    members_copy.remove(master)
+    commons = members_copy
     room['rounds_info'].append({
         'insider': insider,
         'master': master,

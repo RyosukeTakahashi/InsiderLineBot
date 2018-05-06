@@ -5,11 +5,25 @@
 ## 出力
 
 
-## 具体的処理
+## 実装手段候補
+- Heroku and Redis Queue
+    - https://qiita.com/matsulib/items/d3ce4876f58d478406e9
+    - https://github.com/matsulib/line-bot-timer
+- [Celery](http://docs.celeryproject.org/en/latest/getting-started/first-steps-with-celery.html#running-the-celery-worker-server) with Heroku?
+- Azure Function
+    - https://qiita.com/yorifuji/items/7f892564958cf464a812
+    - https://qiita.com/hat22/items/f7b2aec5211951dd7622
+    - https://github.com/yokawasa/azure-functions-python-samples
+    - https://www.buildinsider.net/pr/microsoft/azure/solution02
+    - http://pierre3.hatenablog.com/entry/2017/09/29/165544
+
+
 
 
 ## 環境
 Anaconda python3
+
+候補
 
 ## 準備
 
@@ -32,7 +46,7 @@ Anaconda python3
 - dbとのconnection作成
     - (your app overview) -> create connection
 
-#### .envの作成
+#### .envの準備
 .env.sampleを.envにリネームし編集する。その際、各種APIを以下から取得
 
 - API各種
@@ -45,7 +59,6 @@ Anaconda python3
 #### ibm cloudに環境変数の設定をする
 
 [cloudfoundry/cli download](https://github.com/cloudfoundry/cli/releases)
-
 
 ```bash
 python generate_shell_script_for_set-env.py
@@ -67,7 +80,6 @@ sh set-env.sh
 ## 実行方法
 
 ngrokを使う場合,
-ngrok.exeを起動して、
 Win:`ngrok.exe http 8000`
 Mac:`./ngrok http 8000`
 webhook url をLineダッシュボードで設定して、

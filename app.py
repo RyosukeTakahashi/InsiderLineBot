@@ -24,6 +24,11 @@ from linebot.models import (
     ButtonsTemplate, PostbackTemplateAction, MessageTemplateAction, URITemplateAction
 )
 
+# todo who_answered_the_word
+# todo インサイダーの多数決をして入力してください。道標の場合決選投票をしてください。
+
+# todo count_insider_guess いらないかも・・・
+
 cf_deployment_tracker.track()
 
 if os.path.isfile('.env') or os.path.isfile('env'):
@@ -56,6 +61,7 @@ if CHANNEL_ACCESS_TOKEN is None:
     sys.exit(1)
 
 parser = WebhookParser(CHANNEL_SECRET)
+# line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN, "http://localhost:8080/bot")
 line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 
 if 'VCAP_SERVICES' in os.environ:
@@ -158,65 +164,83 @@ def callback():
 
             if next == 'close':
                 members = room['members']
-                members = list(set(members))
+                # for production, comment out below
+                # members = list(set(members))
                 rounds = int(room['total_rounds'])
                 line_bot_api.multicast(
                     members,
                     [TextSendMessage(text=f"ゲームID{room_id}に参加します"),
                      TextSendMessage(text=f"全部で{rounds}ラウンドです。")]
                 )
-
                 single_round_intro(members, room, room_id, rooms_dict)
 
             if next == 'start':
-                members = room['members']
-                round_info = room['rounds_info']
-                # now = datetime.datetime.now()
-
-                master = round_info[-1]['master']
-                nth_round = len(round_info)
-                line_bot_api.multicast(room['members'],
-                                       [TextSendMessage(text='スタートしました'),
-                                        TextSendMessage(text='各自の役割を遂行してください。')]
-                                       )
-                # round_info[-1]['start_time'] = now.strftime('%Y/%m/%d %H/%M%s')
-                # round_info[-1]['end_time'] = now + datetime.timedelta(seconds=5).strftime('%Y/%m/%d %H/%M%s')
-                # end_time = now + datetime.timedelta(seconds=5)
-
-                line_bot_api.push_message(
-                    master,
-                    get_end_button(room_id, nth_round)
-                )
-
-                reminder_timings = [0, 3, 8]
-
-                # s = sched.scheduler(time.time, time.sleep)
-                # schedule_remind_time(reminder_timings, members, s, is_answered)
-
-                for i, timing in enumerate(reminder_timings):
-                    # t1 = threading.Thread(target=remind, args=(is_answered, members, timing, reminder_timings, i))
-                    # t1.start()
-                    if not round_info[-1]['answered']:
-                        line_bot_api.multicast(
-                            members,
-                            TextSendMessage(text=f'あと{300-timing}秒です。')
-                        )
-                        print(round_info[-1]['answered'])
-                        time.sleep(reminder_timings[i+1] - reminder_timings[i])
+                single_turn_main(room, room_id)
 
             if next == 'answered':
-                room['rounds_info'][-1]["answered"] = True
-                rooms_dict[room_id] = room
-                with open('rooms.json', 'w') as room_json:
-                    json.dump(rooms_dict, room_json, indent=2)
+                single_turn_guess_insider(room, room_id, rooms_dict)
+
+            if "insider_guess" in data_dict:
+                members = room['members']
+                guessed_insider = data_dict["insider_guess"]
+                room['rounds_info'][-1]["insider_guess"].append(guessed_insider)
+                json.dump(rooms_dict, open('rooms.json', 'w'), indent=2)
+                if len(room['rounds_info'][-1]["insider_guess"]) == len(room['members']):
+                    import collections
+                    c = collections.Counter(room['members'])
+                    most_guessed_insider = c.most_common()[0][0]
+                    line_bot_api.multicast(
+                        members,
+                        [TextSendMessage(text=f"ゲームID{room_id}のインサイダーとして疑われたのは、"),
+                         TextSendMessage(text=f"{line_bot_api.get_profile(most_guessed_insider).display_name} です")]
+                    )
+
+
 
             post_postback_to_db(event)
 
     return 'OK'
 
 
-def remind(is_answered, members, timing, reminder_timings, i):
+def single_turn_guess_insider(room, room_id, rooms_dict):
+    room['rounds_info'][-1]["answered"] = True
+    rooms_dict[room_id] = room
+    with open('rooms.json', 'w') as room_json:
+        json.dump(rooms_dict, room_json, indent=2)
+    line_bot_api.multicast(
+        room['members'],
+        [TextSendMessage(text='正解が出たようです。それではインサイダーは誰だったか、議論しましょう。時間は○○秒です。'),
+         TextSendMessage(text='時間切れです。それではインサイダーは誰だか予想しましょう。'),
+         get_guess_insider_carousel(room_id, room["members"])]
+    )
 
+
+def single_turn_main(room, room_id):
+    members = room['members']
+    round_info = room['rounds_info']
+    master = round_info[-1]['master']
+    nth_round = len(round_info)
+    line_bot_api.multicast(room['members'],
+                           [TextSendMessage(text='スタートしました'),
+                            TextSendMessage(text='各自の役割を遂行してください。')]
+                           )
+    line_bot_api.push_message(
+        master,
+        get_end_button(room_id, nth_round)
+    )
+    reminder_timings = [0, 3]
+    for i, timing in enumerate(reminder_timings):
+        print(round_info[-1]['answered'])
+        if not round_info[-1]['answered']:
+            line_bot_api.multicast(
+                members,
+                TextSendMessage(text=f'あと{300-timing}秒です。')
+            )
+            if i is not len(reminder_timings) - 1:
+                time.sleep(reminder_timings[i + 1] - reminder_timings[i])
+
+
+def remind(is_answered, members, timing, reminder_timings, i):
     t = threading.Timer(3, remind)
     t.start()
     if not is_answered:
@@ -225,7 +249,7 @@ def remind(is_answered, members, timing, reminder_timings, i):
             TextSendMessage(text=f'あと{300-timing}秒です。')
         )
 
-    time.sleep(reminder_timings[i+1] - reminder_timings[i])
+    time.sleep(reminder_timings[i + 1] - reminder_timings[i])
 
 
 def send_remaining_time(passed_time, members, is_answered):
@@ -253,19 +277,19 @@ def single_round_intro(members, room, room_id, rooms_dict):
     room['rounds_info'].append({
         'insider': insider,
         'master': master,
-        'answered': False
+        'answered': False,
+        'insider_guess': [],
     })
     rooms_dict[room_id] = room
     with open('rooms.json', 'w') as room_json:
         json.dump(rooms_dict, room_json, indent=2)
 
     nth_round = len(room['rounds_info'])
-    word = room["words"][nth_round-1]
+    word = room["words"][nth_round - 1]
     line_bot_api.multicast(
         members,
         [TextSendMessage(text=f"それでは、第{nth_round}ラウンドを開始します。")]
     )
-
 
     line_bot_api.multicast(
         commons,
@@ -278,7 +302,7 @@ def single_round_intro(members, room, room_id, rooms_dict):
     line_bot_api.push_message(
         insider,
         [TextSendMessage(text='インサイダーはあなたです。'),
-         TextSendMessage(text=f'お題は"{word}"です。（お題はあなたとインサイダー以外には送られていません。）'),
+         TextSendMessage(text=f'お題は"{word}"です。（お題はあなたとマスター以外には送られていません。）'),
          TextSendMessage(text='庶民のふりをしつつ、庶民を裏で操り、お題を当てさせてあげましょう。'),
          TextSendMessage(text='それでは、マスターからの指示を待ちましょう')]
 
@@ -286,7 +310,7 @@ def single_round_intro(members, room, room_id, rooms_dict):
     line_bot_api.push_message(
         master,
         [TextSendMessage(text='マスターはあなたです。マスターであることを皆に伝えてください。'),
-         TextSendMessage(text=f'お題は"{word}"です。（お題はあなたとマスター以外には送られていません。）'),
+         TextSendMessage(text=f'お題は"{word}"です。（お題はあなたとインサイダー以外には送られていません。）'),
          TextSendMessage(text=f'お題に関しての庶民からの質問に「はい」「いいえ」「わからない」の３択で答えていきましょう。'),
          TextSendMessage(text=f'お題の"{word}"を当てられたら「正解です」と答え、「正解が出ました」ボタンを押しましょう'),
          get_start_button(room_id, len(room['rounds_info']))]
@@ -394,6 +418,60 @@ def get_end_button(room_id, nth_round):
     )
 
     return buttons_template_message
+
+
+def get_guess_insider_button(room_id, members, nth_round):
+    actions = [get_display_name_PostbackTemplateAction(user_id, room_id) for user_id in members]
+
+    buttons_template_message = TemplateSendMessage(
+        alt_text='Buttons template',
+        template=ButtonsTemplate(
+            # thumbnail_image_url='https://example.com/image.jpg',
+            title='インサイダーを予測してください',
+            text='お選びください',
+            actions=actions
+        )
+    )
+
+    return buttons_template_message
+
+
+def get_display_name_PostbackTemplateAction(user_id, room_id):
+    display_name = line_bot_api.get_profile(user_id).display_name
+    return PostbackTemplateAction(
+        label=display_name,
+        text=display_name,
+        data=f'room_id={room_id}&insider_guess={user_id}'
+    )
+
+
+def get_guess_insider_carousel(room_id, members):
+    columns = [get_display_name_carousel_column(user_id, room_id) for user_id in members]
+    carousel_template_message = TemplateSendMessage(
+        alt_text='Buttons template',
+        template=CarouselTemplate(
+            columns=columns
+        )
+    )
+
+    return carousel_template_message
+
+
+def get_display_name_carousel_column(user_id, room_id):
+    display_name = line_bot_api.get_profile(user_id).display_name
+
+    return CarouselColumn(
+        title=display_name,
+        text=display_name,
+        actions=[
+            PostbackTemplateAction(
+                label=display_name,
+                text=display_name,
+                data=f'room_id={room_id}&insider_guess={user_id}'
+            )
+        ]
+    )
+
 
 # get template function end
 

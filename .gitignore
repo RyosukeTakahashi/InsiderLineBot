@@ -3,7 +3,7 @@ vcap-local.json
 ngrok.exe
 set-env.sh
 env
-
+ngrok
 
 # Created by .ignore support plugin (hsz.mobi)
 ### Python template

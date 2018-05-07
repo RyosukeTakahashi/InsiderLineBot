@@ -6,10 +6,12 @@
 
 
 ## 実装手段候補
+- https://devcenter.heroku.com/categories/background-jobs-in-python
 - Heroku and Redis Queue
     - https://qiita.com/matsulib/items/d3ce4876f58d478406e9
     - https://github.com/matsulib/line-bot-timer
 - [Celery](http://docs.celeryproject.org/en/latest/getting-started/first-steps-with-celery.html#running-the-celery-worker-server) with Heroku?
+    - https://devcenter.heroku.com/articles/celery-heroku
 - Azure Function
     - https://qiita.com/yorifuji/items/7f892564958cf464a812
     - https://qiita.com/hat22/items/f7b2aec5211951dd7622

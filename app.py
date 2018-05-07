@@ -7,14 +7,17 @@ import atexit
 import random
 import time
 import copy
-import datetime
 import threading
 import sched
+import datetime
 import re
-import json
 import requests
+import json
 import urllib.parse as urlparse
 import cf_deployment_tracker
+from worker import conn
+from utils_line_jobs import set_timer
+from rq import Queue
 from flask import Flask, request, abort, render_template, jsonify
 from linebot import (LineBotApi, WebhookParser)
 from linebot.exceptions import (InvalidSignatureError)
@@ -26,8 +29,6 @@ from linebot.models import (
 
 # todo who_answered_the_word
 # todo インサイダーの多数決をして入力してください。道標の場合決選投票をしてください。
-
-# todo count_insider_guess いらないかも・・・
 
 cf_deployment_tracker.track()
 
@@ -85,8 +86,8 @@ db = client.create_database(DB_NAME, throw_on_exists=False)
 app = Flask(__name__)
 
 port = int(os.getenv('PORT', 8000))
-# 8080 on bluemix
-print("port is {}".format(port))
+# 8080 on bluemix. You can't set port it in bluemix.
+print(f"port is {port}")
 
 
 @app.route('/')
@@ -141,6 +142,18 @@ def callback():
                         get_participation_button()
                     )
 
+                if text in ['t', 'た']:
+                    timestamp = int(str(event.timestamp)[:10])
+                    line_bot_api.reply_message(
+                        event.reply_token,
+                        TextSendMessage(text=f"受け付けました{timestamp}")
+                    )
+
+                    q = Queue(connection=conn)
+                    q.enqueue(set_timer, timestamp)
+
+
+
                 post_text_to_db(event)
 
         if isinstance(event, PostbackEvent):
@@ -149,10 +162,10 @@ def callback():
             data_dict = dict(urlparse.parse_qsl(data_str))
             # you can only use postbackevent for after button action because of below
             room_id = data_dict['room_id']
-            room_json = open('rooms.json', 'r')
-            rooms_dict = json.load(room_json)
+            with open('rooms.json', 'r') as room_json:
+                rooms_dict = json.load(room_json)
+
             room = rooms_dict[room_id]
-            room_json.close()
             try:
                 next = data_dict['next']
             except:
@@ -160,19 +173,19 @@ def callback():
 
             if next == 'get-participation':
                 room['members'].append(event.source.user_id)
-                json.dump(rooms_dict, open('rooms.json', 'w'), indent=2)
+                with open('rooms.json', 'w') as room_json:
+                    json.dump(rooms_dict, room_json, indent=2)
 
             if next == 'close':
                 members = room['members']
-                # for production, comment out below
-                # members = list(set(members))
+                # members = list(set(members))  # for production, comment out below
                 rounds = int(room['total_rounds'])
                 line_bot_api.multicast(
                     members,
                     [TextSendMessage(text=f"ゲームID{room_id}に参加します"),
                      TextSendMessage(text=f"全部で{rounds}ラウンドです。")]
                 )
-                single_round_intro(members, room, room_id, rooms_dict)
+                single_round_intro(members, room, room_id, rerooms_dict)
 
             if next == 'start':
                 single_turn_main(room, room_id)
@@ -181,25 +194,36 @@ def callback():
                 single_turn_guess_insider(room, room_id, rooms_dict)
 
             if "insider_guess" in data_dict:
-                members = room['members']
                 guessed_insider = data_dict["insider_guess"]
                 room['rounds_info'][-1]["insider_guess"].append(guessed_insider)
-                json.dump(rooms_dict, open('rooms.json', 'w'), indent=2)
+                with open('rooms.json', 'w') as room_json:
+                    json.dump(rooms_dict, room_json, indent=2)
                 if len(room['rounds_info'][-1]["insider_guess"]) == len(room['members']):
-                    import collections
-                    c = collections.Counter(room['members'])
-                    most_guessed_insider = c.most_common()[0][0]
-                    line_bot_api.multicast(
-                        members,
-                        [TextSendMessage(text=f"ゲームID{room_id}のインサイダーとして疑われたのは、"),
-                         TextSendMessage(text=f"{line_bot_api.get_profile(most_guessed_insider).display_name} です")]
-                    )
-
-
+                    members = room['members']
+                    result_of_guess_message(members, room, room_id)
 
             post_postback_to_db(event)
 
     return 'OK'
+
+
+def result_of_guess_message(members, room, room_id):
+    import collections
+    c = collections.Counter(room['members'])
+    most_guessed_insider = c.most_common()[0][0]
+    real_insider = room['rounds_info'][-1]['insider']
+    if real_insider == most_guessed_insider:
+        guess_result_message = "庶民がインサイダーを当てることに成功しました。"
+    else:
+        guess_result_message = "インサイダーが狡猾にも庶民を騙すことに成功しました。"
+    line_bot_api.multicast(
+        members,
+        [TextSendMessage(text=f"ゲームID{room_id}のインサイダーとして疑われたのは、"),
+         TextSendMessage(text=f"{line_bot_api.get_profile(most_guessed_insider).display_name} です"),
+         TextSendMessage(text=f"実際のインサイダーは{line_bot_api.get_profile(real_insider).display_name} でした。"),
+         TextSendMessage(text=f"{guess_result_message}"),
+         ]
+    )
 
 
 def single_turn_guess_insider(room, room_id, rooms_dict):
@@ -254,7 +278,7 @@ def remind(is_answered, members, timing, reminder_timings, i):
 
 def send_remaining_time(passed_time, members, is_answered):
     print(is_answered)
-    if is_answered == False:
+    if not is_answered:
         line_bot_api.multicast(
             members,
             TextSendMessage(text=f'あと{300-passed_time}秒です。')
@@ -322,11 +346,10 @@ def single_round_intro(members, room, room_id, rooms_dict):
 # Below are templates functions
 
 def get_participation_button():
-    rooms_json = open('rooms.json', 'r')
-    rooms_dict = json.load(rooms_json)
+    with open('rooms.json', 'r') as room_json:
+        rooms_dict = json.load(room_json)
 
-    rooms_dict.pop('1', None)  # only while testing
-
+    rooms_dict.pop('1', None)  # only while testing to prevent number of rooms from increasing.
     room_count = get_room_count(rooms_dict)
     new_room_id = room_count + 1
 
@@ -346,7 +369,9 @@ def get_participation_button():
             "紅茶"
         ]
     }
-    json.dump(rooms_dict, open('rooms.json', 'w'), indent=2)
+
+    with open('rooms.json', 'w') as room_json:
+        json.dump(rooms_dict, room_json, indent=2)
 
     data_dict = {'room_id': new_room_id,
                  'next': 'get-participation'}

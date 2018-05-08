@@ -1,7 +1,7 @@
 ---
 applications:
   - name: insider-bot
-    domain: insider-bot.mybluemix.net/
+    domain: insider-bot.mybluemix.net
     memory: 128M
     command: python app.py
 

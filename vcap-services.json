@@ -1,0 +1,59 @@
+{
+  "cloudantNoSQLDB": [
+    {
+      "credentials": {
+        "username": "bf29e2d4-5de8-499a-ae12-5247d4f03fe6-bluemix",
+        "password": "55cb24d26737bc137eccfe3d65dc797f580f2ea44496a9173d89a0f7ff4c472e",
+        "host": "bf29e2d4-5de8-499a-ae12-5247d4f03fe6-bluemix.cloudant.com",
+        "port": 443,
+        "url": "https://bf29e2d4-5de8-499a-ae12-5247d4f03fe6-bluemix:55cb24d26737bc137eccfe3d65dc797f580f2ea44496a9173d89a0f7ff4c472e@bf29e2d4-5de8-499a-ae12-5247d4f03fe6-bluemix.cloudant.com"
+      },
+      "syslog_drain_url": null,
+      "volume_mounts": [],
+      "label": "cloudantNoSQLDB",
+      "provider": null,
+      "plan": "Lite",
+      "name": "Cloudant NoSQL DB-62",
+      "tags": [
+        "data_management",
+        "ibm_created",
+        "lite",
+        "ibm_dedicated_public"
+      ]
+    }
+  ],
+  "rediscloud": [
+    {
+      "credentials": {
+        "hostname": "pub-redis-17437.dal-05.1.sl.garantiadata.com",
+        "password": "wWX0uVy5ACcoK2L8yYgO9KXvKyadPkn3",
+        "port": "17437"
+      },
+      "syslog_drain_url": null,
+      "volume_mounts": [],
+      "label": "rediscloud",
+      "provider": null,
+      "plan": "30mb",
+      "name": "Redis Cloud-35",
+      "tags": [
+        "DBA",
+        "(S) Cloud",
+        "Platform",
+        "Bluemix",
+        "Yes",
+        "Service",
+        "Runs on SoftLayer",
+        "(S) IT Infrastructure",
+        "Analytics",
+        "(P) Analytics",
+        "ibm_dedicated_public",
+        "Data Scientist",
+        "Infrastructure",
+        "Development",
+        "data_management",
+        "Application",
+        "ibm_third_party"
+      ]
+    }
+  ]
+}

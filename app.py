@@ -8,10 +8,6 @@ import random
 import time
 import copy
 import threading
-import sched
-import datetime
-import re
-import requests
 import json
 import urllib.parse as urlparse
 import cf_deployment_tracker

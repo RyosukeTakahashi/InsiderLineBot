@@ -1,36 +1,8 @@
 import time
 import asyncio
-import redis
 from linebot.models import TextSendMessage
-from linebot import (LineBotApi, WebhookParser)
-import os
+from constants import line_bot_api, r
 import json
-
-if 'VCAP_SERVICES' in os.environ:
-    vcap = json.loads(os.getenv('VCAP_SERVICES'))
-    print('Found VCAP_SERVICES')
-    if 'rediscloud' in vcap:
-        creds = vcap['rediscloud'][0]['credentials']
-
-
-elif os.path.isfile('vcap-services.json'):
-    with open('vcap-services.json') as f:
-        vcap = json.load(f)
-        print('Found local VCAP_SERVICES')
-        creds = vcap['rediscloud'][0]['credentials']
-
-# else:
-#     r = redis.from_url("redis://localhost:6379")
-
-r = redis.Redis(
-    host=creds['hostname'],
-    password=creds['password'],
-    port=creds['port']
-)
-
-
-CHANNEL_ACCESS_TOKEN = '6IqIN2H9tUAvD4QFUzwlm6DGfV+TMQ3aavxSrkY0JMo/XxlNXVcf5CRFvnI9CDVUdqYGx70RyzJtWYspCZJBej2SQsxL7BjWWsZPtVdr7B9Fm992S8Pr75ElIdXAaz4OFVnQLKvkacIHMtrWVI6E3wdB04t89/1O/w1cDnyilFU='
-line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 
 
 async def timer(delay):
@@ -38,11 +10,20 @@ async def timer(delay):
         now = time.time()
         for name, end_timestamp in r.zrange("timer", 0, -1, withscores=True):
             diff = end_timestamp - now
-            if diff <= 0:
+            print(name)
+            with open('rooms.json', 'r') as room_json:
+                rooms_dict = json.load(room_json)
+                answered = rooms_dict["1"]["rounds_info"][-1]["answered"]
+
+            if answered is True:
+                print("removing since it was answered")
+                r.zrem("timer", name)
+
+            if diff <= 0 and answered is False:
                 # message_id, sender_id, text = name.decode().split(':')
                 line_bot_api.push_message(
                     "U0a028f903127e2178bd789b4b4046ba7",
-                    TextSendMessage(text=f'timer ended {name}\n now {now}')
+                    TextSendMessage(text=f'残りは{name.decode()}秒です。\n now {int(now)}')
                 )
                 r.zrem("timer", name)
             else:
@@ -56,6 +37,7 @@ if __name__ == '__main__':
     print("redis flushed")
     loop = asyncio.get_event_loop()
     try:
-        loop.run_until_complete(timer(1))
+        loop.run_until_complete(timer(2))
     finally:
+        print("closing loop")
         loop.close()

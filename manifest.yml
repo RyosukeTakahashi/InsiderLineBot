@@ -3,7 +3,6 @@ applications:
   - name: insider-bot
     memory: 128M
     command: python app.py
-
   - name: rq-workers
     memory: 64M
     no-route: true
@@ -11,7 +10,6 @@ applications:
     command: python worker.py
     services:
     - Redis Cloud-35
-
   - name: timer-workers
     memory: 64M
     no-route: true

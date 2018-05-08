@@ -3,8 +3,32 @@ import asyncio
 import redis
 from linebot.models import TextSendMessage
 from linebot import (LineBotApi, WebhookParser)
+import os
+import json
 
-r = redis.from_url("redis://localhost:6379")
+if 'VCAP_SERVICES' in os.environ:
+    vcap = json.loads(os.getenv('VCAP_SERVICES'))
+    print('Found VCAP_SERVICES')
+    if 'rediscloud' in vcap:
+        creds = vcap['rediscloud'][0]['credentials']
+
+
+elif os.path.isfile('vcap-services.json'):
+    with open('vcap-services.json') as f:
+        vcap = json.load(f)
+        print('Found local VCAP_SERVICES')
+        creds = vcap['rediscloud'][0]['credentials']
+
+# else:
+#     r = redis.from_url("redis://localhost:6379")
+
+r = redis.Redis(
+    host=creds['hostname'],
+    password=creds['password'],
+    port=creds['port']
+)
+
+
 CHANNEL_ACCESS_TOKEN = '6IqIN2H9tUAvD4QFUzwlm6DGfV+TMQ3aavxSrkY0JMo/XxlNXVcf5CRFvnI9CDVUdqYGx70RyzJtWYspCZJBej2SQsxL7BjWWsZPtVdr7B9Fm992S8Pr75ElIdXAaz4OFVnQLKvkacIHMtrWVI6E3wdB04t89/1O/w1cDnyilFU='
 line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
 

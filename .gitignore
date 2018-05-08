@@ -1,5 +1,4 @@
-manifest.yml
-vcap-local.json
+vcap-services.json
 ngrok.exe
 set-env.sh
 env

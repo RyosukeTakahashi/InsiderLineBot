@@ -15,7 +15,7 @@ import requests
 import json
 import urllib.parse as urlparse
 import cf_deployment_tracker
-from worker import conn
+from worker import r
 from utils_line_jobs import set_timer
 from rq import Queue
 from flask import Flask, request, abort, render_template, jsonify
@@ -42,17 +42,8 @@ else:
 
 CHANNEL_SECRET = os.getenv('CHANNEL_SECRET')
 CHANNEL_ACCESS_TOKEN = os.getenv('CHANNEL_ACCESS_TOKEN')
-PLACES_APIKEY = os.getenv('PLACES_APIKEY')
-GEOCODING_APIKEY = os.getenv('GEOCODING_APIKEY')
 DB_NAME = os.getenv('DB_NAME')
 
-CHATBOT_ENDPOINT = 'https://chatbot-api.userlocal.jp/api/chat'
-SIMPLE_WIKIPEDIA_API = 'http://wikipedia.simpleapi.net/api'
-PLACES_TEXTSEARCH_ENDPOINT = 'https://maps.googleapis.com/maps/api/place/textsearch/json'
-PLACES_NEARBYSEARCH_ENDPOINT = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json'
-PLACES_DETAIL_ENDPOINT = 'https://maps.googleapis.com/maps/api/place/details/json'
-PLACES_PHOTO_ENDPOINT = 'https://maps.googleapis.com/maps/api/place/photo'
-GEOCODING_ENDPOINT = 'https://maps.googleapis.com/maps/api/geocode/json'
 
 if CHANNEL_SECRET is None:
     print('Specify LINE_CHANNEL_SECRET as environment variable.')
@@ -71,11 +62,11 @@ if 'VCAP_SERVICES' in os.environ:
     if 'cloudantNoSQLDB' in vcap:
         creds = vcap['cloudantNoSQLDB'][0]['credentials']
 
-elif os.path.isfile('vcap-local.json'):
-    with open('vcap-local.json') as f:
+elif os.path.isfile('vcap-services.json'):
+    with open('vcap-services.json') as f:
         vcap = json.load(f)
         print('Found local VCAP_SERVICES')
-        creds = vcap['services']['cloudantNoSQLDB'][0]['credentials']
+        creds = vcap['cloudantNoSQLDB'][0]['credentials']
 
 user = creds['username']
 password = creds['password']
@@ -149,7 +140,7 @@ def callback():
                         TextSendMessage(text=f"受け付けました{timestamp}")
                     )
 
-                    q = Queue(connection=conn)
+                    q = Queue(connection=r)
                     q.enqueue(set_timer, timestamp)
 
 
@@ -185,7 +176,7 @@ def callback():
                     [TextSendMessage(text=f"ゲームID{room_id}に参加します"),
                      TextSendMessage(text=f"全部で{rounds}ラウンドです。")]
                 )
-                single_round_intro(members, room, room_id, rerooms_dict)
+                single_round_intro(members, room, room_id, rooms_dict)
 
             if next == 'start':
                 single_turn_main(room, room_id)

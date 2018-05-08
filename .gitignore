@@ -102,3 +102,5 @@ ENV/
 .ropeproject
 
 .idea/
+.DS_Store
+reply_images/.DS_Store

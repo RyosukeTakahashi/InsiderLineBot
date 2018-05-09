@@ -15,12 +15,10 @@ from linebot.models import (
     PostbackEvent, JoinEvent, TemplateSendMessage, CarouselTemplate, CarouselColumn,
     ButtonsTemplate, PostbackTemplateAction, MessageTemplateAction, URITemplateAction
 )
-from constants import line_bot_api, db, client, parser, port, func_mode, reminder_timings_setting
+from constants import line_bot_api, db, client, parser, port, func_mode, reminder_timings_setting, sleep_time
 
-# todo who_answered_the_word
-# インサイダーの多数決をして入力してください。道標の場合決選投票をしてください。
-# todo 開発時とプロダクションで変数がすぐ変えられるようにする。
-
+# todo インサイダー決選投票
+# todo インサイダー議論でsleepのところを非同期にする
 
 cf_deployment_tracker.track()
 
@@ -98,11 +96,21 @@ def callback():
                 room['members'].append(event.source.user_id)
                 with open('rooms.json', 'w') as room_json:
                     json.dump(rooms_dict, room_json, indent=2)
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text=f'参加受付:{line_bot_api.get_profile(event.source.user_id).display_name}')
+                )
 
             if next == 'close':
-                members = room['members']
                 if func_mode is not "dev":
-                    members = list(set(members))  # if in dev, there would be many same IDs.
+                    members = list(set(room["members"]))  # if in dev, there would be many same IDs.
+                else:
+                    members = room['members']
+
+                line_bot_api.push_message(
+                    "U0a028f903127e2178bd789b4b4046ba7",
+                    TextSendMessage(text=f"this is {func_mode} mode")
+                )
 
                 if len(members) < 4:
                     line_bot_api.reply_message(
@@ -111,12 +119,15 @@ def callback():
                          TextSendMessage(text=f"上の参加ボタンをあと{4-len(members)}人以上に押してもらってから、もう一度「参加を締め切るボタン」を押してください。」")]
                     )
                 else:
+                    line_bot_api.reply_message(
+                        event.reply_token,
+                        [TextSendMessage(text=f"皆様の役割を個人メッセージでお送りしました。これ以降は、そちらをご参考ください。")]
+                    )
                     rounds = int(room['total_rounds'])
                     line_bot_api.multicast(
                         members,
                         [TextSendMessage(text=f"ゲームID{room_id}に参加します"),
-                         TextSendMessage(text=f"全部で{rounds}ラウンドです。"),
-                         TextSendMessage(text=f"皆様の役割を個人メッセージでお送りしました。これ以降は、そちらをご参考ください。"), ]
+                         TextSendMessage(text=f"全部で{rounds}ラウンドです。")]
                     )
                     single_round_intro(members, room, room_id, rooms_dict)
 
@@ -269,8 +280,8 @@ def single_turn_guess_insider_when_time_is_up(room, room_id):
         [TextSendMessage(text='インサイダーは世論を操るのに失敗しました。'),
          TextSendMessage(text=f'ですが参考までに、インサイダーは誰だったか、議論しましょう。残り時間は{180}秒です。')]
     )
-    if func_mode == "dev":
-        time.sleep(2)
+    if func_mode is not "production":
+        time.sleep(sleep_time)
     else:
         time.sleep(180)
 

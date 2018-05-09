@@ -6,6 +6,22 @@ from linebot import LineBotApi, WebhookParser
 from cloudant import Cloudant
 import redis
 
+# https://insider-bot.mybluemix.net/
+
+# to change setting easily
+func_mode = "dev"
+# func_mode = "testing"
+# func_mode = "production"
+
+# debugging_tool = 'line-simulator'
+debugging_tool = 'phone'
+
+
+if func_mode == 'dev':
+    reminder_timings_setting = [3, 6, 9]
+if func_mode == "testing":
+    reminder_timings_setting = [3, 90, 150]
+
 if os.path.isfile('.env') or os.path.isfile('env'):
     print('found .env. So it should be a local environment.')
     ENV = load_dotenv('.env')
@@ -27,8 +43,10 @@ if CHANNEL_ACCESS_TOKEN is None:
     print('Specify LINE_CHANNEL_ACCESS_TOKEN as environment variable.')
     sys.exit(1)
 
-# line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN, "http://localhost:8080/bot")
-line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
+if debugging_tool == 'phone':
+    line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN)
+else:
+    line_bot_api = LineBotApi(CHANNEL_ACCESS_TOKEN, "http://localhost:8080/bot")
 
 if 'VCAP_SERVICES' in os.environ:
     vcap = json.loads(os.getenv('VCAP_SERVICES'))

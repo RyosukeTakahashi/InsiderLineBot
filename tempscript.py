@@ -12,17 +12,10 @@ import sched
 import time
 import json
 import redis
+import random
 
+with open('words.txt', 'r') as f:
+    whole_words_list = f.readlines()
 
-r = redis.from_url("redis://localhost:6379")
-
-r.flushall()
-
-r.sadd('this key', 'hello you all'+str(time.time()))
-name = r.smembers('this key')
-print(name)
-
-# r.zadd('my-key', 1.1, 'name1', 2.2, 'name2', name3=3.3, name4=4.4)
-# r.zadd('timer', "hello2" + str(time.time()), time.time())
-print(r.zrange('timer', 0, -1, withscores=True))
-#
+picked_words = [word.replace('\n',"") for word in random.sample(whole_words_list, 5)]
+print(picked_words)

@@ -26,4 +26,3 @@ def set_reminders(timestamp, timings, members, room_id):
         members,
         TextSendMessage(text=f"それでは制限時間内にお題を予測してください。正解が出たらマスターは「正解が出ました」ボタンを押してください。 ")
     )
-

@@ -10,6 +10,7 @@ from utils_line_jobs import set_reminders
 from rq import Queue
 from flask import Flask, request, abort, render_template
 from linebot.exceptions import (InvalidSignatureError)
+# noinspection PyUnresolvedReferences
 from linebot.models import (
     MessageEvent, TextMessage, TextSendMessage, ImageSendMessage, ConfirmTemplate,
     PostbackEvent, JoinEvent, TemplateSendMessage, CarouselTemplate, CarouselColumn,
@@ -57,7 +58,8 @@ def callback():
                     new_room_id = add_room_info_to_json_and_return_room_id()
                     line_bot_api.reply_message(
                         event.reply_token,
-                        get_participation_button(new_room_id)
+                        [TextSendMessage(text="このアカウントを友達登録をしてから、以下の参加ボタンを押してください。"),
+                         get_participation_button(new_room_id)]
                     )
 
                 if text in ['t', 'た']:
@@ -88,11 +90,11 @@ def callback():
 
             room = rooms_dict[room_id]
             try:
-                next = data_dict['next']
-            except:
-                next = ''
+                next_action = data_dict['next_action']
+            except KeyError:
+                next_action = ''
 
-            if next == 'get-participation':
+            if next_action == 'get-participation':
                 room['members'].append(event.source.user_id)
                 with open('rooms.json', 'w') as room_json:
                     json.dump(rooms_dict, room_json, indent=2)
@@ -101,7 +103,7 @@ def callback():
                     TextSendMessage(text=f'参加受付:{line_bot_api.get_profile(event.source.user_id).display_name}')
                 )
 
-            if next == 'close':
+            if next_action == 'close':
                 if func_mode is not "dev":
                     members = list(set(room["members"]))  # if in dev, there would be many same IDs.
                 else:
@@ -131,10 +133,10 @@ def callback():
                     )
                     single_round_intro(members, room, room_id, rooms_dict)
 
-            if next == 'start':
+            if next_action == 'start':
                 single_turn_main(room, room_id, event)
 
-            if next == 'answered':
+            if next_action == 'answered':
                 room['rounds_info'][-1]["answered"] = True
                 rooms_dict[room_id] = room
                 with open('rooms.json', 'w') as room_json:
@@ -143,7 +145,7 @@ def callback():
                 start_timestamp = int(data_dict["start_timestamp"])
                 single_turn_guess_insider(room, room_id, start_timestamp)
 
-            if next == 'word_guess_time_up':
+            if next_action == 'word_guess_time_up':
                 single_turn_guess_insider_when_time_is_up(room, room_id)
 
             if "insider_guess" in data_dict:
@@ -303,6 +305,7 @@ def start_vote_of_insider(room, room_id):
 
 def result_of_guess_message(members, room, room_id):
     import collections
+    # noinspection PyArgumentList
     c = collections.Counter(room['members'][:len(members)])
     most_guessed_insider = c.most_common()[0][0]
     real_insider = room['rounds_info'][-1]['insider']
@@ -337,7 +340,7 @@ def get_participation_button(new_room_id):
                     text='参加する',
                     data=urlparse.urlencode({
                         'room_id': new_room_id,
-                        'next': 'get-participation'
+                        'next_action': 'get-participation'
                     })
                 ),
                 PostbackTemplateAction(
@@ -346,7 +349,7 @@ def get_participation_button(new_room_id):
                     data=urlparse.urlencode(
                         {
                             'room_id': new_room_id,
-                            'next': 'close'
+                            'next_action': 'close'
                         }
                     )
                 )
@@ -368,7 +371,7 @@ def get_start_button(room_id, nth_round):
                 PostbackTemplateAction(
                     label='スタート',
                     text=f'第{nth_round}ラウンドをスタート',
-                    data=f'room_id={room_id}&next=start'
+                    data=f'room_id={room_id}&next_action=start'
                 )
             ]
         )
@@ -388,7 +391,7 @@ def get_end_button(room_id, nth_round, start_timestamp):
                 PostbackTemplateAction(
                     label='正解が出ました',
                     text=f'第{nth_round}ラウンドの正解が出ました',
-                    data=f'room_id={room_id}&start_timestamp={start_timestamp}&next=answered'
+                    data=f'room_id={room_id}&start_timestamp={start_timestamp}&next_action=answered'
                 )
             ]
         )
@@ -413,12 +416,12 @@ def get_display_name_carousel_column(user_id, room_id):
     display_name = line_bot_api.get_profile(user_id).display_name
 
     return CarouselColumn(
-        title=display_name,
-        text=display_name,
+        title="インサイダーを予想しましょう。",
+        text=f'{display_name} さんでしょうか？',
         actions=[
             PostbackTemplateAction(
                 label=display_name,
-                text=display_name,
+                text=f'投票：{display_name}',
                 data=f'room_id={room_id}&insider_guess={user_id}'
             )
         ]

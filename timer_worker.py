@@ -46,7 +46,7 @@ async def timer(delay):
             else:
                 print("breaking from 'for'")
                 break
-        await asyncio.sleep(delay) # indent position is important
+        await asyncio.sleep(delay)  # indent position is important
 
 
 def get_confirm_button_moving_to_insider_guess(room_id):

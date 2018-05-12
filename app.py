@@ -111,7 +111,8 @@ def callback():
                 next_action = ''
 
             if next_action == 'get-participation':
-                get_room_members(room).append(event.source.user_id)
+                room['members'].append({'user_id': event.source.user_id, "score": 0, "display_name": "hoge"})
+                print(room)
                 with open('rooms.json', 'w') as room_json:
                     json.dump(rooms_dict, room_json, indent=2)
                 line_bot_api.reply_message(
@@ -337,7 +338,6 @@ def single_turn_main(room, room_id, event):
 
 
 def single_turn_guess_insider(room, room_id, start_timestamp):
-
     time_left = int(time.time()) - start_timestamp
     line_bot_api.multicast(
         get_room_members(room),
@@ -394,6 +394,7 @@ def start_vote_of_insider(room, room_id):
 def get_members_without_master(room):
     master = room['rounds_info'][-1]['master']
     copy_of_members = copy.deepcopy(get_room_members(room))
+    print(copy_of_members)
     copy_of_members.remove(master)
     members_without_master = copy_of_members
     return members_without_master
@@ -435,7 +436,6 @@ def insider_guess_tournament(room, room_id, members, guessed_insiders):
 
 
 def result_of_guess_message(members, current_round, most_guessed_insider):
-
     real_insider = current_round['insider']
     if real_insider == most_guessed_insider:
         guess_result_message = "庶民がインサイダーを当てることに成功しました。"
@@ -693,8 +693,9 @@ def get_display_name(user_id):
 
 
 def get_room_members(room: dict):
-    # return list(room['members'].keys())
-    return room['members']
+    return list([member_info['user_id'] for member_info in room['members']])
+    # return room['members']
+
 
 #####################################
 

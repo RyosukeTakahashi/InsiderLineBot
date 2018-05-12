@@ -43,9 +43,7 @@ import copy
 # removing since it was answered
 # breaking from 'for'
 
-#なるほど、word予想のところに入ってしまい、zrangeがなくなってしまってそれでなくなっている。
-
-
+# なるほど、word予想のところに入ってしまい、zrangeがなくなってしまってそれでなくなっている。
 
 async def timer(delay):
     while True:
@@ -134,7 +132,7 @@ def get_confirm_button_moving_to_insider_guess(room_id):
 def start_vote_of_insider(room, room_id):
     members_without_master = get_members_without_master(room)
     line_bot_api.multicast(
-        room['members'],
+        get_room_members(room),
         [TextSendMessage(text='時間切れです。すぐに以下のボタンからインサイダーと思う人を投票してください。全員の票が集まったら、結果を発表します。'),
          get_guess_insider_carousel(room_id, members_without_master, False)]
     )
@@ -142,7 +140,8 @@ def start_vote_of_insider(room, room_id):
 
 def get_members_without_master(room):
     master = room['rounds_info'][-1]['master']
-    copy_of_members = copy.deepcopy(room['members'])
+    copy_of_members = copy.deepcopy(get_room_members(room))
+    print(copy_of_members)
     copy_of_members.remove(master)
     members_without_master = copy_of_members
     return members_without_master
@@ -177,6 +176,10 @@ def get_display_name_carousel_column(user_id, room_id, is_final_guess):
         ]
     )
 
+
+def get_room_members(room: dict):
+    return list([member_info['user_id'] for member_info in room['members']])
+    # return room['members']
 
 
 if __name__ == '__main__':

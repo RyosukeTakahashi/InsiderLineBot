@@ -62,5 +62,6 @@ class TestLineBot(unittest.TestCase):
             }
 
         print(rooms_dict)
+        print(list(rooms_dict["1"]["members"].keys()))
         with open('rooms.json', 'w') as room_json:
             json.dump(rooms_dict, room_json, indent=2)

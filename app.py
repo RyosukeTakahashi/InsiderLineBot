@@ -25,7 +25,7 @@ from constants import line_bot_api, db, client, parser, port, func_mode, reminde
 # todo ポイントをつけて、5ラウンドでどれだけ点数をとれるか。
 
 # todo 画像を入れて、区切りを見えやすくする。
-# todo sleepしているときに他のグループがどうなるかの検証
+# todo sleepをなくしてschedulerに移行するか、キューに投げる
 
 
 app = Flask(__name__)
@@ -111,7 +111,7 @@ def callback():
                 next_action = ''
 
             if next_action == 'get-participation':
-                room['members'].append(event.source.user_id)
+                get_room_members(room).append(event.source.user_id)
                 with open('rooms.json', 'w') as room_json:
                     json.dump(rooms_dict, room_json, indent=2)
                 line_bot_api.reply_message(
@@ -141,8 +141,8 @@ def callback():
                 current_round = room['rounds_info'][-1]
                 accept_vote(current_round, data_dict, event, rooms_dict)
 
-                if len(current_round["insider_guess"]) >= len(room['members']):
-                    members = room['members']
+                if len(current_round["insider_guess"]) >= len(get_room_members(room)):
+                    members = get_room_members(room)
                     # noinspection PyArgumentList
                     c = collections.Counter(current_round['insider_guess'][:len(members)])
                     vote_result_sorted = c.most_common()
@@ -163,7 +163,7 @@ def callback():
                             single_round_intro(members, room, room_id, rooms_dict)
 
             if "last_guess" in data_dict:
-                members = room["members"]
+                members = get_room_members(room)
                 current_round = room['rounds_info'][-1]
                 last_guessed_insider = data_dict["insider_guess"]
                 result_of_guess_message(members, current_round, last_guessed_insider)
@@ -205,9 +205,9 @@ def accept_vote(current_round, data_dict, event, rooms_dict):
 
 def close_participation(event, room, room_id, rooms_dict):
     if func_mode is not "one_phone_dev":
-        members = list(set(room["members"]))  # if in dev, there would be many same IDs.
+        members = list(set(get_room_members(room)))  # if in dev, there would be many same IDs.
     else:
-        members = room['members']
+        members = get_room_members(room)
         line_bot_api.push_message(
             "U0a028f903127e2178bd789b4b4046ba7",
             TextSendMessage(text=f"this is {func_mode} mode")
@@ -245,7 +245,7 @@ def add_room_info_to_json_and_return_room_id():
         whole_words_list = f.readlines()
     picked_words = [word.replace('\n', "") for word in random.sample(whole_words_list, 5)]
     rooms_dict[str(new_room_id)] = {
-        "members": [],
+        'members': [],
         "total_rounds": 5,
         "rounds_info": [],
         "words": picked_words
@@ -308,11 +308,11 @@ def single_round_intro(members, room, room_id, rooms_dict):
 
 
 def single_turn_main(room, room_id, event):
-    members = room['members']
+    members = get_room_members(room)
     round_info = room['rounds_info']
     master = round_info[-1]['master']
     nth_round = len(round_info)
-    line_bot_api.multicast(room['members'],
+    line_bot_api.multicast(get_room_members(room),
                            [TextSendMessage(text=f'第{nth_round}ラウンドをスタートしました'),
                             TextSendMessage(text='各自の役割を遂行してください。')]
                            )
@@ -340,7 +340,7 @@ def single_turn_guess_insider(room, room_id, start_timestamp):
 
     time_left = int(time.time()) - start_timestamp
     line_bot_api.multicast(
-        room['members'],
+        get_room_members(room),
         [TextSendMessage(text='お題の正解が出たようです。'),
          TextSendMessage(text=f'それではインサイダーは誰だったか、議論しましょう。{time_left}秒議論したので、残り時間は{time_left}秒です。')]
     )
@@ -365,7 +365,7 @@ def single_turn_guess_insider(room, room_id, start_timestamp):
     print(r.zrange('timer', 0, -1, withscores=True))
 
     q = Queue(connection=r)
-    q.enqueue(set_reminders, int(time.time()), reminder_timings, room["members"],
+    q.enqueue(set_reminders, int(time.time()), reminder_timings, get_room_members(room),
               room_id, master, guessing_time, guessed_object)
 
     # start_vote_of_insider(room, room_id)
@@ -373,7 +373,7 @@ def single_turn_guess_insider(room, room_id, start_timestamp):
 
 def single_turn_guess_insider_when_time_is_up(room, room_id):
     line_bot_api.multicast(
-        room['members'],
+        get_room_members(room),
         [TextSendMessage(text='インサイダーは世論を操るのに失敗しました。'),
          TextSendMessage(text=f'ですが参考までに、インサイダーは誰だったか、議論しましょう。残り時間は{sleep_time}秒です。')]
     )
@@ -385,7 +385,7 @@ def single_turn_guess_insider_when_time_is_up(room, room_id):
 def start_vote_of_insider(room, room_id):
     members_without_master = get_members_without_master(room)
     line_bot_api.multicast(
-        room['members'],
+        get_room_members(room),
         [TextSendMessage(text='時間切れです。すぐに以下のボタンからインサイダーと思う人を投票してください。全員の票が集まったら、結果を発表します。'),
          get_guess_insider_carousel(room_id, members_without_master, False)]
     )
@@ -393,7 +393,7 @@ def start_vote_of_insider(room, room_id):
 
 def get_members_without_master(room):
     master = room['rounds_info'][-1]['master']
-    copy_of_members = copy.deepcopy(room['members'])
+    copy_of_members = copy.deepcopy(get_room_members(room))
     copy_of_members.remove(master)
     members_without_master = copy_of_members
     return members_without_master
@@ -692,6 +692,12 @@ def get_display_name(user_id):
     return line_bot_api.get_profile(user_id).display_name
 
 
+def get_room_members(room: dict):
+    # return list(room['members'].keys())
+    return room['members']
+
 #####################################
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=port, host='0.0.0.0')

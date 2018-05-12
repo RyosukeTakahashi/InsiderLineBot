@@ -8,6 +8,7 @@
 ## 実装手段候補
 - https://devcenter.heroku.com/categories/background-jobs-in-python
 - Heroku and Redis Queue
+    - 現状はこちらを参照。
     - https://qiita.com/matsulib/items/d3ce4876f58d478406e9
     - https://github.com/matsulib/line-bot-timer
 - [Celery](http://docs.celeryproject.org/en/latest/getting-started/first-steps-with-celery.html#running-the-celery-worker-server) with Heroku?

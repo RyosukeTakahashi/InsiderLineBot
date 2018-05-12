@@ -9,23 +9,32 @@ import redis
 # https://insider-bot.mybluemix.net/
 
 # to change setting easily
-# func_mode = "dev"
-func_mode = "testing"
+func_mode = "one_phone_dev"
+# func_mode = "multi_phone_dev"
+# func_mode = "testing"
 # func_mode s= "production"
 
 # debugging_tool = 'line-simulator'
 debugging_tool = 'phone'
 
 
-if func_mode == 'dev':
+if func_mode == "one_phone_dev":
+    reminder_timings_setting = [3, 6, 9]
+    reminder_timings_setting = [2, 32, 62]
+    sleep_time = 3
+
+if func_mode == "multi_phone_dev":
     reminder_timings_setting = [3, 6, 9]
     sleep_time = 3
 
 if func_mode == "testing":
-    reminder_timings_setting = [3, 93, 153, 183]
-    sleep_time = 180
-    # reminder_timings_setting = [3, 6, 9]
-    # sleep_time = 3
+    reminder_timings_setting = [2, 92, 152, 182]
+    sleep_time = 90
+
+if func_mode == "production":
+    reminder_timings_setting = [2, 92, 152, 182]
+    sleep_time = 90
+
 
 if os.path.isfile('.env') or os.path.isfile('env'):
     print('found .env. So it should be a local environment.')

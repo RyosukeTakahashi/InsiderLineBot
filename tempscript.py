@@ -19,3 +19,9 @@ with open('words.txt', 'r') as f:
 
 picked_words = [word.replace('\n',"") for word in random.sample(whole_words_list, 5)]
 print(picked_words)
+
+print(list(range(3, 184, 60)))
+guessing_time = 127
+reminder_timings = list(range(3, guessing_time, 60))
+reminder_timings.append(guessing_time+3)
+print(reminder_timings)

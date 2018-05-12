@@ -1,7 +1,10 @@
 from __future__ import unicode_literals
+
+import collections
 import copy
 import json
 import urllib.parse as urlparse
+# noinspection PyUnresolvedReferences
 import cf_deployment_tracker
 import time
 import random
@@ -18,10 +21,12 @@ from linebot.models import (
 )
 from constants import line_bot_api, db, client, parser, port, func_mode, reminder_timings_setting, sleep_time
 
-# todo インサイダー決選投票
-# todo インサイダー議論でsleepのところを非同期にする
+# todo インサイダー予想時間実装。sleepのところを非同期にする。確認ボタンを連打すると長くなってしまう。
+# todo ポイントをつけて、5ラウンドでどれだけ点数をとれるか。
 
-cf_deployment_tracker.track()
+# todo 画像を入れて、区切りを見えやすくする。
+# todo sleepしているときに他のグループがどうなるかの検証
+
 
 app = Flask(__name__)
 
@@ -77,6 +82,17 @@ def callback():
                 if text in ['f', 'ふ']:
                     change_answer_state_to_false(event)
 
+                if text in ['sleep']:
+                    line_bot_api.reply_message(
+                        event.reply_token,
+                        [TextSendMessage(text="3sec sleep")]
+                    )
+                    time.sleep(5)
+                    line_bot_api.push_message(
+                        event.source.user_id,
+                        [TextSendMessage(text="sleep end")]
+                    )
+
                 post_text_to_db(event)
 
         if isinstance(event, PostbackEvent):
@@ -104,34 +120,7 @@ def callback():
                 )
 
             if next_action == 'close':
-                if func_mode is not "dev":
-                    members = list(set(room["members"]))  # if in dev, there would be many same IDs.
-                else:
-                    members = room['members']
-
-                line_bot_api.push_message(
-                    "U0a028f903127e2178bd789b4b4046ba7",
-                    TextSendMessage(text=f"this is {func_mode} mode")
-                )
-
-                if len(members) < 4:
-                    line_bot_api.reply_message(
-                        event.reply_token,
-                        [TextSendMessage(text=f"最低でも4人必要です。5~8人がおすすめです。"),
-                         TextSendMessage(text=f"上の参加ボタンをあと{4-len(members)}人以上に押してもらってから、もう一度「参加を締め切るボタン」を押してください。」")]
-                    )
-                else:
-                    line_bot_api.reply_message(
-                        event.reply_token,
-                        [TextSendMessage(text=f"皆様の役割を個人メッセージでお送りしました。これ以降は、そちらをご参考ください。")]
-                    )
-                    rounds = int(room['total_rounds'])
-                    line_bot_api.multicast(
-                        members,
-                        [TextSendMessage(text=f"ゲームID{room_id}に参加します"),
-                         TextSendMessage(text=f"全部で{rounds}ラウンドです。")]
-                    )
-                    single_round_intro(members, room, room_id, rooms_dict)
+                close_participation(event, room, room_id, rooms_dict)
 
             if next_action == 'start':
                 single_turn_main(room, room_id, event)
@@ -148,21 +137,99 @@ def callback():
             if next_action == 'word_guess_time_up':
                 single_turn_guess_insider_when_time_is_up(room, room_id)
 
-            if "insider_guess" in data_dict:
-                guessed_insider = data_dict["insider_guess"]
-                room['rounds_info'][-1]["insider_guess"].append(guessed_insider)
-                with open('rooms.json', 'w') as room_json:
-                    json.dump(rooms_dict, room_json, indent=2)
+            if "insider_guess" in data_dict and "last_guess" not in data_dict:
+                current_round = room['rounds_info'][-1]
+                accept_vote(current_round, data_dict, event, rooms_dict)
 
-                if len(room['rounds_info'][-1]["insider_guess"]) >= len(room['members']):
+                if len(current_round["insider_guess"]) >= len(room['members']):
                     members = room['members']
-                    result_of_guess_message(members, room, room_id)
+                    # noinspection PyArgumentList
+                    c = collections.Counter(current_round['insider_guess'][:len(members)])
+                    vote_result_sorted = c.most_common()
+                    has_same_rate, guessed_insiders = has_same_rate_first_place(vote_result_sorted)
+                    most_guessed_insider = vote_result_sorted[0][0]
+
+                    if has_same_rate:
+                        insider_guess_tournament(room, room_id, members, guessed_insiders)
+                    else:
+                        result_of_guess_message(members, current_round, most_guessed_insider)
+                        if current_round == room["total_rounds"]:
+                            line_bot_api.multicast(
+                                members,
+                                TextSendMessage(text=f"{current_round}ラウンドが終わりました。ゲームを終了します。")
+                            )
+                        else:
+                            time.sleep(2)
+                            single_round_intro(members, room, room_id, rooms_dict)
+
+            if "last_guess" in data_dict:
+                members = room["members"]
+                current_round = room['rounds_info'][-1]
+                last_guessed_insider = data_dict["insider_guess"]
+                result_of_guess_message(members, current_round, last_guessed_insider)
+
+                if current_round == room["total_rounds"]:
+                    line_bot_api.multicast(
+                        members,
+                        TextSendMessage(text=f"{current_round}ラウンドが終わりました。ゲームを終了します。")
+                    )
+                else:
                     time.sleep(2)
                     single_round_intro(members, room, room_id, rooms_dict)
 
             post_postback_to_db(event)
 
     return 'OK'
+
+
+def accept_vote(current_round, data_dict, event, rooms_dict):
+    guessed_insider = data_dict["insider_guess"]
+    already_voteds = current_round["commons_who_already_voted"]
+    if event.source.user_id not in already_voteds or func_mode == "one_phone_dev":
+        current_round["insider_guess"].append(guessed_insider)
+        already_voteds.append(event.source.user_id)
+        line_bot_api.reply_message(
+            event.reply_token,
+            [TextSendMessage(text="投票を受け付けました。"),
+             TextSendMessage(text=f"{len(already_voteds)}人が投票済みです。")]
+        )
+
+    elif func_mode != "one_phone_dev":
+        line_bot_api.reply_message(
+            event.reply_token,
+            TextSendMessage(text="あなたは投票済みです。")
+        )
+    with open('rooms.json', 'w') as room_json:
+        json.dump(rooms_dict, room_json, indent=2)
+
+
+def close_participation(event, room, room_id, rooms_dict):
+    if func_mode is not "one_phone_dev":
+        members = list(set(room["members"]))  # if in dev, there would be many same IDs.
+    else:
+        members = room['members']
+        line_bot_api.push_message(
+            "U0a028f903127e2178bd789b4b4046ba7",
+            TextSendMessage(text=f"this is {func_mode} mode")
+        )
+    if len(members) < 4:
+        line_bot_api.reply_message(
+            event.reply_token,
+            [TextSendMessage(text=f"最低でも4人必要です。5~8人がおすすめです。"),
+             TextSendMessage(text=f"上の参加ボタンをあと{4-len(members)}人以上に押してもらってから、もう一度「参加を締め切るボタン」を押してください。」")]
+        )
+    else:
+        line_bot_api.reply_message(
+            event.reply_token,
+            [TextSendMessage(text=f"皆様の役割を個人メッセージでお送りしました。これ以降は、そちらをご参考ください。")]
+        )
+        rounds = int(room['total_rounds'])
+        line_bot_api.multicast(
+            members,
+            [TextSendMessage(text=f"ゲームID{room_id}に参加します"),
+             TextSendMessage(text=f"全部で{rounds}ラウンドです。")]
+        )
+        single_round_intro(members, room, room_id, rooms_dict)
 
 
 def add_room_info_to_json_and_return_room_id():
@@ -201,6 +268,7 @@ def single_round_intro(members, room, room_id, rooms_dict):
         'master': master,
         'answered': False,
         'insider_guess': [],
+        'commons_who_already_voted': []
     })
     rooms_dict[room_id] = room
     with open('rooms.json', 'w') as room_json:
@@ -258,64 +326,124 @@ def single_turn_main(room, room_id, event):
 
     reminder_timings = reminder_timings_setting
     q = Queue(connection=r)
-    q.enqueue(set_reminders, start_timestamp, reminder_timings, members, room_id)
+    guessing_time = 182
+    guessed_object = "word"
+    q.enqueue(set_reminders, start_timestamp, reminder_timings, members, room_id, master, guessing_time, guessed_object)
+
+    line_bot_api.multicast(
+        members,
+        TextSendMessage(text=f"それでは制限時間内にお題を予測してください。正解が出たらマスターは「正解が出ました」ボタンを押してください。 ")
+    )
 
 
 def single_turn_guess_insider(room, room_id, start_timestamp):
+
     time_left = int(time.time()) - start_timestamp
     line_bot_api.multicast(
         room['members'],
         [TextSendMessage(text='お題の正解が出たようです。'),
          TextSendMessage(text=f'それではインサイダーは誰だったか、議論しましょう。{time_left}秒議論したので、残り時間は{time_left}秒です。')]
     )
-    if func_mode == "dev":
-        time.sleep(2)
-    else:
-        time.sleep(time_left)
+    # if func_mode in ["one_phone_dev", "multi_phone_dev"]:
+    #     time.sleep(2)
 
-    start_vote_of_insider(room, room_id)
+    round_info = room['rounds_info']
+    master = round_info[-1]['master']
+    guessing_time = time_left
+    reminder_timings = list(range(2, guessing_time, 30))
+    reminder_timings.append(guessing_time)
+    guessed_object = "insider"
+
+    # 残っていたタイマーを消す。複数のグループがやっていたらやばいかも？さらにグループIDでしぼれがいいか。
+    set_list = r.zrange("timer", 0, -1, withscores=True)
+    for i, value_score in enumerate(set_list):
+        end_timestamp = value_score[1]
+        if end_timestamp < time.time():
+            r.zrem("timer", value_score[0])
+
+    print("printing zrange")
+    print(r.zrange('timer', 0, -1, withscores=True))
+
+    q = Queue(connection=r)
+    q.enqueue(set_reminders, int(time.time()), reminder_timings, room["members"],
+              room_id, master, guessing_time, guessed_object)
+
+    # start_vote_of_insider(room, room_id)
 
 
 def single_turn_guess_insider_when_time_is_up(room, room_id):
     line_bot_api.multicast(
         room['members'],
         [TextSendMessage(text='インサイダーは世論を操るのに失敗しました。'),
-         TextSendMessage(text=f'ですが参考までに、インサイダーは誰だったか、議論しましょう。残り時間は{180}秒です。')]
+         TextSendMessage(text=f'ですが参考までに、インサイダーは誰だったか、議論しましょう。残り時間は{sleep_time}秒です。')]
     )
-    if func_mode is not "production":
-        time.sleep(sleep_time)
-    else:
-        time.sleep(180)
+    time.sleep(sleep_time)
 
     start_vote_of_insider(room, room_id)
 
 
 def start_vote_of_insider(room, room_id):
+    members_without_master = get_members_without_master(room)
+    line_bot_api.multicast(
+        room['members'],
+        [TextSendMessage(text='時間切れです。すぐに以下のボタンからインサイダーと思う人を投票してください。全員の票が集まったら、結果を発表します。'),
+         get_guess_insider_carousel(room_id, members_without_master, False)]
+    )
+
+
+def get_members_without_master(room):
     master = room['rounds_info'][-1]['master']
     copy_of_members = copy.deepcopy(room['members'])
     copy_of_members.remove(master)
     members_without_master = copy_of_members
-    print(members_without_master)
+    return members_without_master
+
+
+def has_same_rate_first_place(vote_result_sorted):
+    biggest_vote_count = vote_result_sorted[0][1]
+    vote_dict = {}
+    for word, count in vote_result_sorted:
+        if count in vote_dict.keys():
+            vote_dict[count].append(word)
+        else:
+            vote_dict[count] = [word]
+
+    has_same_rate = False
+    guessed_insiders = vote_dict[biggest_vote_count]
+    if len(guessed_insiders) > 1:
+        has_same_rate = True
+    return has_same_rate, guessed_insiders
+
+
+def insider_guess_tournament(room, room_id, members, guessed_insiders):
+    master = room['rounds_info'][-1]['master']
+    print("printing guessed insiders")
+    print(guessed_insiders)
+    guessed_insiders_str = ', '.join([get_display_name(guessed_insider) for guessed_insider in guessed_insiders])
     line_bot_api.multicast(
-        room['members'],
-        [TextSendMessage(text='時間切れです。すぐに以下のボタンからインサイダーと思う人を投票してください。全員の票が集まったら、結果を発表します。'),
-         get_guess_insider_carousel(room_id, members_without_master)]
+        members,
+        [TextSendMessage(text="投票の結果、同率一位がいました。"),
+         TextSendMessage(text=f"{guessed_insiders_str} が最もインサイダーの疑惑がかけられています。"),
+         TextSendMessage(text="マスターが議論をして、最終インサイダー予想をしてください。"),
+         TextSendMessage(text="マスターに投票ボタンを送りました。")]
+    )
+
+    line_bot_api.push_message(
+        master,
+        get_guess_insider_carousel(room_id, get_members_without_master(room), True)
     )
 
 
-def result_of_guess_message(members, room, room_id):
-    import collections
-    # noinspection PyArgumentList
-    c = collections.Counter(room['members'][:len(members)])
-    most_guessed_insider = c.most_common()[0][0]
-    real_insider = room['rounds_info'][-1]['insider']
+def result_of_guess_message(members, current_round, most_guessed_insider):
+
+    real_insider = current_round['insider']
     if real_insider == most_guessed_insider:
         guess_result_message = "庶民がインサイダーを当てることに成功しました。"
     else:
         guess_result_message = "インサイダーが狡猾にも庶民を騙すことに成功しました。"
     line_bot_api.multicast(
         members,
-        [TextSendMessage(text=f"ゲームID{room_id}のインサイダーとして疑われたのは、"),
+        [TextSendMessage(text=f"インサイダーとして疑われたのは、"),
          TextSendMessage(text=f"{line_bot_api.get_profile(most_guessed_insider).display_name} です"),
          TextSendMessage(text=f"実際のインサイダーは{line_bot_api.get_profile(real_insider).display_name} でした。"),
          TextSendMessage(text=f"{guess_result_message}"),
@@ -400,8 +528,8 @@ def get_end_button(room_id, nth_round, start_timestamp):
     return buttons_template_message
 
 
-def get_guess_insider_carousel(room_id, members):
-    columns = [get_display_name_carousel_column(user_id, room_id) for user_id in members]
+def get_guess_insider_carousel(room_id, members, is_final_guess):
+    columns = [get_display_name_carousel_column(user_id, room_id, is_final_guess) for user_id in members]
     carousel_template_message = TemplateSendMessage(
         alt_text='Buttons template',
         template=CarouselTemplate(
@@ -412,9 +540,11 @@ def get_guess_insider_carousel(room_id, members):
     return carousel_template_message
 
 
-def get_display_name_carousel_column(user_id, room_id):
+def get_display_name_carousel_column(user_id, room_id, is_final_guess):
     display_name = line_bot_api.get_profile(user_id).display_name
-
+    last_guess_text = ""
+    if is_final_guess:
+        last_guess_text = "&last_guess=true"
     return CarouselColumn(
         title="インサイダーを予想しましょう。",
         text=f'{display_name} さんでしょうか？',
@@ -422,7 +552,7 @@ def get_display_name_carousel_column(user_id, room_id):
             PostbackTemplateAction(
                 label=display_name,
                 text=f'投票：{display_name}',
-                data=f'room_id={room_id}&insider_guess={user_id}'
+                data=f'room_id={room_id}&insider_guess={user_id}{last_guess_text}'
             )
         ]
     )
@@ -555,6 +685,11 @@ def get_postback_data_dict(data):
 def get_list_without_insider(members, insider):
     members.remove(insider)
     return members
+
+
+def get_display_name(user_id):
+    print(f'user_id is {user_id}')
+    return line_bot_api.get_profile(user_id).display_name
 
 
 #####################################

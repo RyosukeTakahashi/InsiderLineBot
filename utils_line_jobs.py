@@ -5,24 +5,28 @@ import json
 # 登録するJob(function)をここに書いていく
 
 
-def set_reminders(timestamp, timings, members, room_id):
+def set_reminders(start_timestamp, timings, members, room_id, master, guessing_time, guessed_object):
 
     value_dict = {
         "time_left": 0,
         "members": members,
-        "room_id": room_id
-    }
+        "room_id": room_id,
+        "master": master,
+        "guessed_object": guessed_object
 
+    }
+    print(timings)
+    print(type(timings))
+    # reminder_timings_setting = timings = [3, 93, 153, 183]
     for timing in timings:
-        end_timestamp = timing + timestamp
-        value_dict["time_left"] = 183-timing
+        end_timestamp = timing + start_timestamp
+        value_dict["time_left"] = guessing_time-timing
         value_json = json.dumps(value_dict)
 
         r.zadd('timer', value_json, end_timestamp)
         print("set added to redis")
 
     print(r.zrange('timer', 0, -1, withscores=True))
-    line_bot_api.multicast(
-        members,
-        TextSendMessage(text=f"それでは制限時間内にお題を予測してください。正解が出たらマスターは「正解が出ました」ボタンを押してください。 ")
-    )
+
+
+#

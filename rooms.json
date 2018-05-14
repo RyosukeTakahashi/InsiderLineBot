@@ -45,33 +45,16 @@
         "insider": "U0a028f903127e2178bd789b4b4046ba7",
         "master": "U0a028f903127e2178bd789b4b4046ba7",
         "answered": false,
-        "insider_guess": [
-          "U0a028f903127e2178bd789b4b4046ba7",
-          "U0a028f903127e2178bd789b4b4046ba7",
-          "U0a028f903127e2178bd789b4b4046ba7",
-          "U0a028f903127e2178bd789b4b4046ba7"
-        ],
-        "commons_who_already_voted": [
-          "U0a028f903127e2178bd789b4b4046ba7",
-          "U0a028f903127e2178bd789b4b4046ba7",
-          "U0a028f903127e2178bd789b4b4046ba7",
-          "U0a028f903127e2178bd789b4b4046ba7"
-        ]
-      },
-      {
-        "insider": "U0a028f903127e2178bd789b4b4046ba7",
-        "master": "U0a028f903127e2178bd789b4b4046ba7",
-        "answered": false,
         "insider_guess": [],
         "commons_who_already_voted": []
       }
     ],
     "words": [
-      "\u5c71",
-      "\u82f1\u8a9e",
-      "\u6298\u308a\u305f\u305f\u307f\u5098",
-      "\u307f\u304b\u3093",
-      "\u3053\u305f\u3064"
+      "\u82b1\u7c89",
+      "\u6bdb\u5e03",
+      "\u6d88\u706b\u5668",
+      "\u91ce\u7403",
+      "\u307e\u306a\u677f"
     ]
   }
 }

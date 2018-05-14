@@ -8,20 +8,58 @@
 # master = room['master_order'][0]
 # members.remove(insider)
 
-import sched
+# import sched
+# import time
+# import json
+# import redis
+# import random
+# from pytz import utc
+#
+# from apscheduler.schedulers.background import BackgroundScheduler
+# from apscheduler.schedulers.background import BlockingScheduler
+# import time
+# # sched = BackgroundScheduler()
+# sched = BlockingScheduler()
+#
+#
+# def timed_job():
+#     with open('test.txt', 'w') as f:
+#         f.write(f'{time.time()}')
+#
+#     print('this job is run every 1 sec')
+#
+#
+# sched.add_job(timed_job, 'interval', seconds=1)
+# sched.start()
+
+
+from datetime import datetime
 import time
-import json
-import redis
-import random
+import os
 
-with open('words.txt', 'r') as f:
-    whole_words_list = f.readlines()
+from apscheduler.schedulers.background import BackgroundScheduler
 
-picked_words = [word.replace('\n',"") for word in random.sample(whole_words_list, 5)]
-print(picked_words)
 
-print(list(range(3, 184, 60)))
-guessing_time = 127
-reminder_timings = list(range(3, guessing_time, 60))
-reminder_timings.append(guessing_time+3)
-print(reminder_timings)
+def tick(scheduler_starttime):
+    diff = time.time() - scheduler_starttime
+    if diff > 3:
+        job_id = scheduler.get_jobs()[0]
+        print(job_id)
+        scheduler.remove_job('timer')
+    print(diff)
+
+
+if __name__ == '__main__':
+    scheduler = BackgroundScheduler()
+    scheduler_starttime = time.time()
+    scheduler.add_job(lambda: tick(scheduler_starttime), 'interval', seconds=1, id='timer')
+    scheduler.start()
+    print('Press Ctrl+{0} to exit'.format('Break' if os.name == 'nt' else 'C'))
+
+    try:
+        # This is here to simulate application activity (which keeps the main thread alive).
+        while True:
+            time.sleep(2)
+    except (KeyboardInterrupt, SystemExit):
+        # Not strictly necessary if daemonic mode is enabled but should be done if possible
+        scheduler.shutdown()

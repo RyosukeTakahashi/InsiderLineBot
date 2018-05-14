@@ -82,17 +82,6 @@ def callback():
                 if text in ['f', 'ふ']:
                     change_answer_state_to_false(event)
 
-                if text in ['sleep']:
-                    line_bot_api.reply_message(
-                        event.reply_token,
-                        [TextSendMessage(text="3sec sleep")]
-                    )
-                    time.sleep(5)
-                    line_bot_api.push_message(
-                        event.source.user_id,
-                        [TextSendMessage(text="sleep end")]
-                    )
-
                 post_text_to_db(event)
 
         if isinstance(event, PostbackEvent):
@@ -160,7 +149,6 @@ def callback():
                                 TextSendMessage(text=f"{current_round}ラウンドが終わりました。ゲームを終了します。")
                             )
                         else:
-                            time.sleep(2)
                             single_round_intro(members, room, room_id, rooms_dict)
 
             if "last_guess" in data_dict:
@@ -175,7 +163,6 @@ def callback():
                         TextSendMessage(text=f"{current_round}ラウンドが終わりました。ゲームを終了します。")
                     )
                 else:
-                    time.sleep(2)
                     single_round_intro(members, room, room_id, rooms_dict)
 
             post_postback_to_db(event)
@@ -195,7 +182,7 @@ def accept_vote(current_round, data_dict, event, rooms_dict):
              TextSendMessage(text=f"{len(already_voteds)}人が投票済みです。")]
         )
 
-    elif func_mode != "one_phone_dev":
+    elif event.source.user_id in already_voteds:
         line_bot_api.reply_message(
             event.reply_token,
             TextSendMessage(text="あなたは投票済みです。")
@@ -344,8 +331,6 @@ def single_turn_guess_insider(room, room_id, start_timestamp):
         [TextSendMessage(text='お題の正解が出たようです。'),
          TextSendMessage(text=f'それではインサイダーは誰だったか、議論しましょう。{time_left}秒議論したので、残り時間は{time_left}秒です。')]
     )
-    # if func_mode in ["one_phone_dev", "multi_phone_dev"]:
-    #     time.sleep(2)
 
     round_info = room['rounds_info']
     master = round_info[-1]['master']
@@ -377,7 +362,8 @@ def single_turn_guess_insider_when_time_is_up(room, room_id):
         [TextSendMessage(text='インサイダーは世論を操るのに失敗しました。'),
          TextSendMessage(text=f'ですが参考までに、インサイダーは誰だったか、議論しましょう。残り時間は{sleep_time}秒です。')]
     )
-    time.sleep(sleep_time)
+
+    time.sleep(sleep_time)  # APScheduler?試すべき
 
     start_vote_of_insider(room, room_id)
 

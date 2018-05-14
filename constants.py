@@ -47,7 +47,7 @@ else:
 CHANNEL_SECRET = os.getenv('CHANNEL_SECRET')
 CHANNEL_ACCESS_TOKEN = os.getenv('CHANNEL_ACCESS_TOKEN')
 DB_NAME = os.getenv('DB_NAME')
-
+print(CHANNEL_SECRET)
 parser = WebhookParser(CHANNEL_SECRET)
 
 if CHANNEL_SECRET is None:
@@ -68,6 +68,7 @@ if 'VCAP_SERVICES' in os.environ:
     vcap = json.loads(os.getenv('VCAP_SERVICES'))
     print('Found VCAP_SERVICES')
     if 'cloudantNoSQLDB' in vcap:
+        print("cloundantNoSQLDB is found")
         cloundant_creds = vcap['cloudantNoSQLDB'][0]['credentials']
         redis_creds = vcap['rediscloud'][0]['credentials']
         r = redis.Redis(
@@ -83,7 +84,14 @@ elif os.path.isfile('vcap-services.json'):
         print('Found local VCAP_SERVICES')
         cloundant_creds = vcap['cloudantNoSQLDB'][0]['credentials']
         r = redis.from_url("redis://localhost:6379")
-        print("created local redis")
+        # redis_creds = vcap['rediscloud'][0]['credentials']
+        # r = redis.Redis(
+        #     host=redis_creds['hostname'],
+        #     password=redis_creds['password'],
+        #     port=redis_creds['port']
+        # )
+
+        print("created cloud redis connection")
 
 user = cloundant_creds['username']
 password = cloundant_creds['password']

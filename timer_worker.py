@@ -6,45 +6,6 @@ import json
 import copy
 
 
-# 1 4sec
-# i:0, set_list_len:4
-# answered: True
-# guessed_object: insider
-# diff:-2.2144792079925537
-# 1526104006.0
-# removed one
-# zrangelength :3
-#
-#
-# 1 177sec
-# i:1, set_list_len:3
-# answered: True
-# guessed_object: word
-# diff:-0.2144792079925537
-# removing since it was answered
-# breaking from 'for'
-#
-#
-# 1 0sec
-# i:0, set_list_len:2
-# answered: True
-# guessed_object: insider
-# diff:-0.5179698467254639
-# 1526104010.0
-# removed one
-# zrangelength :1
-#
-#
-# 1 174sec
-# i:1, set_list_len:1
-# answered: True
-# guessed_object: word
-# diff:0.48203015327453613
-# removing since it was answered
-# breaking from 'for'
-
-# なるほど、word予想のところに入ってしまい、zrangeがなくなってしまってそれでなくなっている。
-
 async def timer(delay):
     while True:
         now = time.time()
@@ -189,6 +150,6 @@ if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     try:
         loop.run_until_complete(timer(2))
-        print("one loop ended")
     finally:
+        print("loop closing")
         loop.close()

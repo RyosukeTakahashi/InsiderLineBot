@@ -19,8 +19,8 @@ debugging_tool = 'phone'
 
 
 if func_mode == "one_phone_dev":
-    reminder_timings_setting = [3, 6, 9]
-    reminder_timings_setting = [2, 32, 62]
+    reminder_timings_setting = [3, 6]
+    # reminder_timings_setting = [2, 32, 62]
     sleep_time = 3
 
 if func_mode == "multi_phone_dev":
@@ -91,7 +91,7 @@ elif os.path.isfile('vcap-services.json'):
         #     port=redis_creds['port']
         # )
 
-        print("created cloud redis connection")
+        print("created local redis connection")
 
 user = cloundant_creds['username']
 password = cloundant_creds['password']

@@ -9,11 +9,11 @@ applications:
     health-check-type: none
     command: python worker.py
     services:
-    - Redis Cloud-35
+    - Redis Cloud-r7
   - name: timer-worker
     memory: 64M
     no-route: true
     health-check-type: none
     command: python timer_worker.py
     services:
-    - Redis Cloud-35
+    - Redis Cloud-r7

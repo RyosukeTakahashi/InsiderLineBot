@@ -1,38 +1,3 @@
-# 最初にインサイダーとマスターを決めるかいなか。
-# room['insider_order'] = [random.choice(members) for i in range(rounds)]
-# print((room['insider_order']))
-# room['master_order'] = [random.choice(get_list_without_insider(members, room['insider_order'][i])) for i in range(rounds)]
-# rooms_dict[room_id] = room
-# json.dump(rooms_dict, open('rooms.json', 'w'), indent=2)
-# insider = room['insider_order'][0]
-# master = room['master_order'][0]
-# members.remove(insider)
-
-# import sched
-# import time
-# import json
-# import redis
-# import random
-# from pytz import utc
-#
-# from apscheduler.schedulers.background import BackgroundScheduler
-# from apscheduler.schedulers.background import BlockingScheduler
-# import time
-# # sched = BackgroundScheduler()
-# sched = BlockingScheduler()
-#
-#
-# def timed_job():
-#     with open('test.txt', 'w') as f:
-#         f.write(f'{time.time()}')
-#
-#     print('this job is run every 1 sec')
-#
-#
-# sched.add_job(timed_job, 'interval', seconds=1)
-# sched.start()
-
-
 from datetime import datetime
 import time
 import os

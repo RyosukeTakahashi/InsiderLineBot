@@ -8,6 +8,9 @@ import urllib.parse as urlparse
 import cf_deployment_tracker
 import time
 import random
+
+from apscheduler.schedulers.background import BackgroundScheduler
+
 from worker import r
 from utils_line_jobs import set_reminders
 from rq import Queue
@@ -363,9 +366,28 @@ def single_turn_guess_insider_when_time_is_up(room, room_id):
          TextSendMessage(text=f'ですが参考までに、インサイダーは誰だったか、議論しましょう。残り時間は{sleep_time}秒です。')]
     )
 
-    time.sleep(sleep_time)  # APScheduler?試すべき
+    # scheduler = BackgroundScheduler()
+    scheduler_starttime = time.time()
+    scheduler.add_job(lambda: timer_for_insider_guess(scheduler_starttime, room, room_id), 'interval', seconds=30, id='timer')
 
-    start_vote_of_insider(room, room_id)
+    # time.sleep(sleep_time)  # APScheduler?試すべき
+    # start_vote_of_insider(room, room_id)
+
+
+def timer_for_insider_guess(scheduler_starttime, room, room_id):
+    diff = int(time.time() - scheduler_starttime)
+    time_limit = 90
+    if diff >= time_limit:
+
+        scheduler.remove_job('timer')
+        start_vote_of_insider(room, room_id)
+    if diff < time_limit:
+        line_bot_api.multicast(
+            get_room_members(room),
+            [TextSendMessage(text=f'残り{time_limit - diff}秒')]
+        )
+
+    print(diff)
 
 
 def start_vote_of_insider(room, room_id):
@@ -687,4 +709,6 @@ def get_room_members(room: dict):
 
 
 if __name__ == "__main__":
+    scheduler = BackgroundScheduler()
+    scheduler.start()
     app.run(debug=True, port=port, host='0.0.0.0')

@@ -12,7 +12,7 @@ import redis
 # func_mode = "one_phone_dev"
 # func_mode = "multi_phone_dev"
 func_mode = "testing"
-# func_mode s= "production"
+# func_mode= "production"
 
 # debugging_tool = 'line-simulator'
 debugging_tool = 'phone'
@@ -88,12 +88,6 @@ elif os.path.isfile('vcap-services.json'):
         print('Found local VCAP_SERVICES')
         cloundant_creds = vcap['cloudantNoSQLDB'][0]['credentials']
         r = redis.from_url("redis://localhost:6379")
-        # redis_creds = vcap['rediscloud'][0]['credentials']
-        # r = redis.Redis(
-        #     host=redis_creds['hostname'],
-        #     password=redis_creds['password'],
-        #     port=redis_creds['port']
-        # )
 
         print("created local redis connection")
 

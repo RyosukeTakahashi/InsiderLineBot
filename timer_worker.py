@@ -31,6 +31,11 @@ async def timer(delay):
             print(f'guessed_object: {guessed_object}')
             print(f'diff:{diff}')
 
+            if guessed_object == "insider":
+                guessed_object_jpn = "インサイダー推理"
+            elif guessed_object == "word":
+                guessed_object_jpn = "お題あて"
+
             if answered is True and guessed_object == "word":
                 print("removing since it was answered")
                 r.zrem("timer", value_score[0])
@@ -40,7 +45,7 @@ async def timer(delay):
                 print(end_timestamp)
                 line_bot_api.multicast(
                     members,
-                    TextSendMessage(text=f'残り{time_left}秒です。')
+                    TextSendMessage(text=f'{guessed_object_jpn}の残り時間、{time_left}秒です。')
                 )
                 r.zrem("timer", value_score[0])
                 print("removed one")

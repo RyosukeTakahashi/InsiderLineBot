@@ -122,6 +122,7 @@ def callback():
                 rooms_dict[room_id] = room
                 with open('rooms.json', 'w') as room_json:
                     json.dump(rooms_dict, room_json, indent=2)
+                    print("dumped json")
 
                 start_timestamp = int(data_dict["start_timestamp"])
                 single_turn_guess_insider(room, room_id, start_timestamp)
@@ -145,7 +146,7 @@ def callback():
                         insider_guess_tournament(room, room_id, members, guessed_insiders)
                     else:
                         result_of_guess_message(room, current_round, most_guessed_insider)
-                        if current_round == room["total_rounds"]:
+                        if len(room['rounds_info']) == room["total_rounds"]:
                             line_bot_api.multicast(
                                 members,
                                 TextSendMessage(text=f"{current_round}ラウンドが終わりました。ゲームを終了します。")
@@ -355,8 +356,6 @@ def single_turn_guess_insider(room, room_id, start_timestamp):
     q.enqueue(set_reminders, int(time.time()), reminder_timings, get_room_members(room),
               room_id, master, guessing_time, guessed_object)
 
-    # start_vote_of_insider(room, room_id)
-
 
 def single_turn_guess_insider_when_time_is_up(room, room_id):
     line_bot_api.multicast(
@@ -453,7 +452,8 @@ def result_of_guess_message(room, current_round, most_guessed_insider):
         guess_result_message = "インサイダーが狡猾にも庶民を騙すことに成功しました。"
         calculate_score_when_insider_guess_was_wrong(real_insider, room)
 
-    scores_text_list = [f'{get_display_name(user_info["user_id"])}: {user_info["score"]}' for user_info in room["members"]]
+    scores_text_list = \
+        [f'{get_display_name(user_info["user_id"])}: {user_info["score"]}' for user_info in room["members"]]
     scores_text = '\n'.join(scores_text_list)
 
     line_bot_api.multicast(
@@ -588,31 +588,6 @@ def get_display_name_carousel_column(user_id, room_id, is_final_guess):
             )
         ]
     )
-
-
-# def get_guess_insider_button(room_id, members, nth_round):
-#     actions = [get_display_name_postback_template_action(user_id, room_id) for user_id in members]
-#
-#     buttons_template_message = TemplateSendMessage(
-#         alt_text='Buttons template',
-#         template=ButtonsTemplate(
-#             # thumbnail_image_url='https://example.com/image.jpg',
-#             title='インサイダーを予測してください',
-#             text='お選びください',
-#             actions=actions
-#         )
-#     )
-#
-#     return buttons_template_message
-#
-#
-# def get_display_name_postback_template_action(user_id, room_id):
-#     display_name = line_bot_api.get_profile(user_id).display_name
-#     return PostbackTemplateAction(
-#         label=display_name,
-#         text=display_name,
-#         data=f'room_id={room_id}&insider_guess={user_id}'
-#     )
 
 
 # get template function end

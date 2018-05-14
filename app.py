@@ -478,7 +478,7 @@ def calculate_score_when_insider_guess_was_wrong(real_insider, room):
 def calculate_score_when_insider_guess_was_correct(real_insider, room):
     for member_info in room["members"]:
         if member_info["user_id"] == real_insider:
-            member_info["score"] -=insider_caught_penalty
+            member_info["score"] -= insider_caught_penalty
         else:  # commons
             member_info["score"] += insider_guess_correct_point
 

@@ -4,7 +4,7 @@ applications:
     memory: 128M
     command: python app.py
     services:
-    - Cloundant NoSQL DB-2u
+    - Cloudant NoSQL DB-2u
     - Redis Cloud-r7
   - name: rq-worker
     memory: 64M
@@ -12,7 +12,7 @@ applications:
     health-check-type: none
     command: python worker.py
     services:
-    - Cloundant NoSQL DB-2u
+    - Cloudant NoSQL DB-2u
     - Redis Cloud-r7
   - name: timer-worker
     memory: 64M
@@ -21,4 +21,4 @@ applications:
     command: python timer_worker.py
     services:
     - Redis Cloud-r7
-    - Cloundant NoSQL DB-2u
+    - Cloudant NoSQL DB-2u

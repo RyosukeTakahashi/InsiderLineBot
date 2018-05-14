@@ -22,13 +22,12 @@ from linebot.models import (
     PostbackEvent, JoinEvent, TemplateSendMessage, CarouselTemplate, CarouselColumn,
     ButtonsTemplate, PostbackTemplateAction, MessageTemplateAction, URITemplateAction
 )
-from constants import line_bot_api, db, client, parser, port, func_mode, reminder_timings_setting, sleep_time
-
-# todo インサイダー予想時間実装。sleepのところを非同期にする。確認ボタンを連打すると長くなってしまう。
-# todo ポイントをつけて、5ラウンドでどれだけ点数をとれるか。
+from constants import (
+    line_bot_api, db, client, parser, port, func_mode, reminder_timings_setting, sleep_time,
+    insider_caught_penalty, insider_uncaught_score, insider_guess_correct_point, insider_guess_wrong_penalty
+)
 
 # todo 画像を入れて、区切りを見えやすくする。
-# todo sleepをなくしてschedulerに移行するか、キューに投げる
 
 
 app = Flask(__name__)
@@ -471,17 +470,17 @@ def result_of_guess_message(room, current_round, most_guessed_insider):
 def calculate_score_when_insider_guess_was_wrong(real_insider, room):
     for member_info in room["members"]:
         if member_info["user_id"] == real_insider:
-            member_info["score"] += 5
+            member_info["score"] += insider_uncaught_score
         else:  # commons
-            member_info["score"] -= 0
+            member_info["score"] -= insider_guess_wrong_penalty
 
 
 def calculate_score_when_insider_guess_was_correct(real_insider, room):
     for member_info in room["members"]:
         if member_info["user_id"] == real_insider:
-            member_info["score"] -= 5
+            member_info["score"] -=insider_caught_penalty
         else:  # commons
-            member_info["score"] += 5
+            member_info["score"] += insider_guess_correct_point
 
 
 #######################################

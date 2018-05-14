@@ -9,22 +9,26 @@ import redis
 # https://insider-bot.mybluemix.net/
 
 # to change setting easily
-func_mode = "one_phone_dev"
+# func_mode = "one_phone_dev"
 # func_mode = "multi_phone_dev"
-# func_mode = "testing"
+func_mode = "testing"
 # func_mode s= "production"
 
 # debugging_tool = 'line-simulator'
 debugging_tool = 'phone'
 
+insider_guess_correct_point = 5
+insider_guess_wrong_penalty = 0
+insider_uncaught_score = 5
+insider_caught_penalty = 5
 
 if func_mode == "one_phone_dev":
-    reminder_timings_setting = [3, 6]
+    reminder_timings_setting = [2, 4]
     # reminder_timings_setting = [2, 32, 62]
     sleep_time = 3
 
 if func_mode == "multi_phone_dev":
-    reminder_timings_setting = [3, 6, 9]
+    reminder_timings_setting = [2, 4, 8]
     sleep_time = 3
 
 if func_mode == "testing":

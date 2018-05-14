@@ -3,27 +3,27 @@
     "members": [
       {
         "user_id": "U0a028f903127e2178bd789b4b4046ba7",
-        "score": 0,
+        "score": -20,
         "display_name": "hoge"
       },
       {
         "user_id": "U0a028f903127e2178bd789b4b4046ba7",
-        "score": 0,
+        "score": -20,
         "display_name": "hoge"
       },
       {
         "user_id": "U0a028f903127e2178bd789b4b4046ba7",
-        "score": 0,
+        "score": -20,
         "display_name": "hoge"
       },
       {
         "user_id": "U0a028f903127e2178bd789b4b4046ba7",
-        "score": 0,
+        "score": -20,
         "display_name": "hoge"
       },
       {
         "user_id": "U0a028f903127e2178bd789b4b4046ba7",
-        "score": 0,
+        "score": -20,
         "display_name": "hoge"
       }
     ],
@@ -53,11 +53,45 @@
         "master": "U0a028f903127e2178bd789b4b4046ba7",
         "answered": false,
         "insider_guess": [
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7",
           "U0a028f903127e2178bd789b4b4046ba7"
         ],
         "commons_who_already_voted": [
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7",
           "U0a028f903127e2178bd789b4b4046ba7"
         ]
+      },
+      {
+        "insider": "U0a028f903127e2178bd789b4b4046ba7",
+        "master": "U0a028f903127e2178bd789b4b4046ba7",
+        "answered": false,
+        "insider_guess": [
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7"
+        ],
+        "commons_who_already_voted": [
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7",
+          "U0a028f903127e2178bd789b4b4046ba7"
+        ]
+      },
+      {
+        "insider": "U0a028f903127e2178bd789b4b4046ba7",
+        "master": "U0a028f903127e2178bd789b4b4046ba7",
+        "answered": false,
+        "insider_guess": [],
+        "commons_who_already_voted": []
       }
     ],
     "words": [

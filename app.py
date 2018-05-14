@@ -145,7 +145,7 @@ def callback():
                     if has_same_rate:
                         insider_guess_tournament(room, room_id, members, guessed_insiders)
                     else:
-                        result_of_guess_message(members, current_round, most_guessed_insider)
+                        result_of_guess_message(room, current_round, most_guessed_insider)
                         if current_round == room["total_rounds"]:
                             line_bot_api.multicast(
                                 members,
@@ -158,7 +158,7 @@ def callback():
                 members = get_room_members(room)
                 current_round = room['rounds_info'][-1]
                 last_guessed_insider = data_dict["insider_guess"]
-                result_of_guess_message(members, current_round, last_guessed_insider)
+                result_of_guess_message(room, current_round, last_guessed_insider)
 
                 if current_round == room["total_rounds"]:
                     line_bot_api.multicast(
@@ -368,7 +368,8 @@ def single_turn_guess_insider_when_time_is_up(room, room_id):
 
     # scheduler = BackgroundScheduler()
     scheduler_starttime = time.time()
-    scheduler.add_job(lambda: timer_for_insider_guess(scheduler_starttime, room, room_id), 'interval', seconds=30, id='timer')
+    scheduler.add_job(lambda: timer_for_insider_guess(scheduler_starttime, room, room_id),
+                      'interval', seconds=30, id='timer')
 
     # time.sleep(sleep_time)  # APScheduler?試すべき
     # start_vote_of_insider(room, room_id)
@@ -443,20 +444,44 @@ def insider_guess_tournament(room, room_id, members, guessed_insiders):
     )
 
 
-def result_of_guess_message(members, current_round, most_guessed_insider):
+def result_of_guess_message(room, current_round, most_guessed_insider):
     real_insider = current_round['insider']
+
     if real_insider == most_guessed_insider:
         guess_result_message = "庶民がインサイダーを当てることに成功しました。"
+        calculate_score_when_insider_guess_was_correct(real_insider, room)
     else:
         guess_result_message = "インサイダーが狡猾にも庶民を騙すことに成功しました。"
+        calculate_score_when_insider_guess_was_wrong(real_insider, room)
+
+    scores_text_list = [f'{get_display_name(user_info["user_id"])}: {user_info["score"]}' for user_info in room["members"]]
+    scores_text = '\n'.join(scores_text_list)
+
     line_bot_api.multicast(
-        members,
+        get_room_members(room),
         [TextSendMessage(text=f"インサイダーとして疑われたのは、"),
          TextSendMessage(text=f"{line_bot_api.get_profile(most_guessed_insider).display_name} です"),
          TextSendMessage(text=f"実際のインサイダーは{line_bot_api.get_profile(real_insider).display_name} でした。"),
          TextSendMessage(text=f"{guess_result_message}"),
+         TextSendMessage(text=f"現在のスコアです。\n\n{scores_text}")
          ]
     )
+
+
+def calculate_score_when_insider_guess_was_wrong(real_insider, room):
+    for member_info in room["members"]:
+        if member_info["user_id"] == real_insider:
+            member_info["score"] += 5
+        else:  # commons
+            member_info["score"] -= 0
+
+
+def calculate_score_when_insider_guess_was_correct(real_insider, room):
+    for member_info in room["members"]:
+        if member_info["user_id"] == real_insider:
+            member_info["score"] -= 5
+        else:  # commons
+            member_info["score"] += 5
 
 
 #######################################

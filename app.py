@@ -9,6 +9,7 @@ import cf_deployment_tracker
 import time
 import random
 
+import datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 
 from worker import r
@@ -20,12 +21,13 @@ from linebot.exceptions import (InvalidSignatureError)
 from linebot.models import (
     MessageEvent, TextMessage, TextSendMessage, ImageSendMessage, ConfirmTemplate,
     PostbackEvent, JoinEvent, TemplateSendMessage, CarouselTemplate, CarouselColumn,
-    ButtonsTemplate, PostbackTemplateAction, MessageTemplateAction, URITemplateAction
-)
+    ButtonsTemplate, PostbackTemplateAction, MessageTemplateAction, URITemplateAction,
+    FollowEvent)
 from constants import (
-    line_bot_api, db, client, parser, port, func_mode, reminder_timings_setting, sleep_time,
-    insider_caught_penalty, insider_uncaught_score, insider_guess_correct_point, insider_guess_wrong_penalty
-)
+    line_bot_api, db, client, parser, port, func_mode, reminder_timings_setting,
+    insider_caught_penalty, insider_uncaught_score, insider_guess_correct_point, insider_guess_wrong_penalty,
+    remind_interval, time_limit, rule,
+    round_img)
 
 # todo 画像を入れて、区切りを見えやすくする。
 
@@ -54,6 +56,20 @@ def callback():
         abort(400)
 
     for event in events:
+        if isinstance(event, FollowEvent):
+            line_bot_api.reply_message(
+                event.reply_token,
+                [TextSendMessage(text="インサイダー風ゲームBot友だちとなって頂きありがとうございます！\n"),
+                 TextSendMessage(text="一緒にゲームをするメンバーがいるルームで、'す'を入力するとスタートできます！"),
+                 TextSendMessage(text="'る'を入力するとルールが表示されます！")]
+            )
+
+        if isinstance(event, JoinEvent):
+            line_bot_api.reply_message(
+                event.reply_token,
+                [TextSendMessage(text="インサイダー風ゲームBotを招待していただきありがとうございます！\n"),
+                 TextSendMessage(text="'す'を入力するとスタート、'る'を入力するとルールが表示されます！")]
+            )
 
         if isinstance(event, MessageEvent):
 
@@ -69,20 +85,17 @@ def callback():
                          get_participation_button(new_room_id)]
                     )
 
-                if text in ['t', 'た']:
-                    sample_timer(event)
-
                 if text in ['m', 'main']:
                     with open('rooms.json', 'r') as room_json:
                         rooms_dict = json.load(room_json)
                     room = rooms_dict["1"]
                     single_turn_main(room, "1", event)
 
-                if text in ['c', 'か']:
-                    change_answer_state_to_true(event)
-
-                if text in ['f', 'ふ']:
-                    change_answer_state_to_false(event)
+                if text in ['r', 'rule', 'ルール', 'る', '説明', 'ル']:
+                    line_bot_api.reply_message(
+                        event.reply_token,
+                        [TextSendMessage(text=rule)]
+                    )
 
                 post_text_to_db(event)
 
@@ -133,9 +146,8 @@ def callback():
             if "insider_guess" in data_dict and "last_guess" not in data_dict:
                 current_round = room['rounds_info'][-1]
                 accept_vote(current_round, data_dict, event, rooms_dict)
-
-                if len(current_round["insider_guess"]) >= len(get_room_members(room)):
-                    members = get_room_members(room)
+                members = get_room_members(room)
+                if len(current_round["insider_guess"]) >= len(members):
                     # noinspection PyArgumentList
                     c = collections.Counter(current_round['insider_guess'][:len(members)])
                     vote_result_sorted = c.most_common()
@@ -269,8 +281,10 @@ def single_round_intro(members, room, room_id, rooms_dict):
     word = room["words"][nth_round - 1]
     line_bot_api.multicast(
         members,
-        [TextSendMessage(text=f"それでは、第{nth_round}ラウンドを開始します。")]
+        [TextSendMessage(text=f"それでは、第{nth_round}ラウンドを開始します。"),
+         ImageSendMessage(original_content_url=round_img[nth_round], preview_image_url=round_img[nth_round])]
     )
+    print(round_img[nth_round])
 
     line_bot_api.multicast(
         commons,
@@ -352,30 +366,55 @@ def single_turn_guess_insider(room, room_id, start_timestamp):
     print("printing zrange")
     print(r.zrange('timer', 0, -1, withscores=True))
 
-    q = Queue(connection=r)
-    q.enqueue(set_reminders, int(time.time()), reminder_timings, get_room_members(room),
-              room_id, master, guessing_time, guessed_object)
+    # q = Queue(connection=r)
+    # q.enqueue(set_reminders, int(time.time()), reminder_timings, get_room_members(room),
+    #           room_id, master, guessing_time, guessed_object)
+    add_job_insider_guess_reminder(time_left, room, room_id)
+
+
+def add_job_insider_guess_reminder(time_limit, room, room_id):
+    # time_lefts = list(range(0, time_limit, remind_interval))
+    time_lefts = list(range(0, 13, remind_interval))
+    time_lefts.append(time_limit)
+    print("")
+    print(time_lefts)
+    now = datetime.datetime.now()
+    members = get_room_members(room)
+    remind_dts = [{
+        "dt": now + datetime.timedelta(seconds=time_limit - time_left),
+        "time_left": time_left
+    } for time_left in time_lefts]
+
+    for remind_dt in remind_dts:
+        scheduler.add_job(send_insider_guess_reminder, 'date', run_date=remind_dt["dt"],
+                          args=[remind_dt["time_left"], members, room, room_id])
+    print(scheduler.print_jobs())
+
+
+def send_insider_guess_reminder(text, members, room, room_id):
+    line_bot_api.multicast(
+        members,
+        TextSendMessage(text=f'インサイダー予想時間：残り{text}秒')
+    )
+    if text == 0:
+        start_vote_of_insider(room, room_id)
+        pass
 
 
 def single_turn_guess_insider_when_time_is_up(room, room_id):
     line_bot_api.multicast(
         get_room_members(room),
         [TextSendMessage(text='インサイダーは世論を操るのに失敗しました。'),
-         TextSendMessage(text=f'ですが参考までに、インサイダーは誰だったか、議論しましょう。残り時間は{sleep_time}秒です。')]
+         TextSendMessage(text=f'ですが参考までに、インサイダーは誰だったか、議論しましょう。残り時間は\n{time_limit}秒です。')]
     )
 
-    # scheduler = BackgroundScheduler()
     scheduler_starttime = time.time()
-    scheduler.add_job(lambda: timer_for_insider_guess(scheduler_starttime, room, room_id),
-                      'interval', seconds=30, id='timer')
-
-    # time.sleep(sleep_time)  # APScheduler?試すべき
-    # start_vote_of_insider(room, room_id)
+    scheduler.add_job(lambda: timer_for_last_insider_guess(scheduler_starttime, room, room_id, time_limit),
+                      'interval', seconds=remind_interval, id='timer')
 
 
-def timer_for_insider_guess(scheduler_starttime, room, room_id):
+def timer_for_last_insider_guess(scheduler_starttime, room, room_id, time_limit):
     diff = int(time.time() - scheduler_starttime)
-    time_limit = 90
     if diff >= time_limit:
 
         scheduler.remove_job('timer')
@@ -496,7 +535,7 @@ def get_participation_button(new_room_id):
             text='参加者はボタンを押してください。',
             actions=[
                 PostbackTemplateAction(
-                    label='参加する',
+                    label='参加する(要:友達追加)',
                     text='参加する',
                     data=urlparse.urlencode({
                         'room_id': new_room_id,

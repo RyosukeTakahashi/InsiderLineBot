@@ -4,10 +4,29 @@ import json
 import random
 import sched
 import time
-from app import get_display_name
+import os
+from apscheduler.schedulers.background import BackgroundScheduler
+
+import app
 
 
 class TestLineBot(unittest.TestCase):
+
+    def test_insider_guess_reminder(self):
+        scheduler = BackgroundScheduler()
+        scheduler.start()
+
+        app.insider_guess_reminder(27, scheduler)
+        print('Press Ctrl+{0} to exit'.format('Break' if os.name == 'nt' else 'C'))
+
+        try:
+            # This is here to simulate application activity (which keeps the main thread alive).
+            while True:
+                time.sleep(2)
+        except (KeyboardInterrupt, SystemExit):
+            # Not strictly necessary if daemonic mode is enabled but should be done if possible
+            scheduler.shutdown()
+
 
     def test_get_room_count(self):
         rooms_json = json.load(open('rooms.json'))

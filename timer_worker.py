@@ -1,6 +1,9 @@
 import time
 import asyncio
-from linebot.models import TextSendMessage, ButtonsTemplate, TemplateSendMessage, PostbackTemplateAction, CarouselColumn, CarouselTemplate
+from linebot.models import (
+    TextSendMessage, ButtonsTemplate,
+    TemplateSendMessage, PostbackTemplateAction, CarouselColumn, CarouselTemplate
+)
 from constants import line_bot_api, r
 import json
 import copy
@@ -49,7 +52,7 @@ async def timer(delay):
                 )
                 r.zrem("timer", value_score[0])
                 print("removed one")
-                print(f'zrangelength :{len(r.zrange("timer", 0, -1, withscores=True))}\n')
+                print(f'z range length :{len(r.zrange("timer", 0, -1, withscores=True))}\n')
 
                 if len(r.zrange("timer", 0, -1, withscores=True)) == 0 or time_left == 0:
                     if guessed_object == "word":
@@ -63,12 +66,6 @@ async def timer(delay):
                             master,
                             [get_confirm_button_moving_to_insider_guess(room_id)]
                         )
-                    if guessed_object == "insider":
-                        with open('rooms.json', 'r') as room_json:
-                            rooms_dict = json.load(room_json)
-                            room = rooms_dict[room_id]
-
-                        start_vote_of_insider(room, room_id)
 
             else:
                 print("breaking from 'for'\n")

@@ -56,7 +56,7 @@ def callback():
             line_bot_api.reply_message(
                 event.reply_token,
                 [TextSendMessage(text="インサイダー風ゲームBot友だちとなって頂きありがとうございます！\n"),
-                 TextSendMessage(text="一緒にゲームをするメンバーがいるルームで、'す'を入力するとスタートできます！"),
+                 TextSendMessage(text="一緒にゲームをするメンバーがいるルームで、'す'を入力するとスタート！"),
                  TextSendMessage(text="'る'を入力するとルールが表示されます！")]
             )
 

@@ -24,8 +24,8 @@ insider_caught_penalty = 5
 
 
 if func_mode == "one_phone_dev":
-    # reminder_timings_setting = [2, 4]
-    reminder_timings_setting = [2, 32, 62]
+    reminder_timings_setting = [2, 4]
+    # reminder_timings_setting = [2, 32, 62]
     insider_guess_remind_interval = 10
     time_limit_when_word_guess_failed = 30
 

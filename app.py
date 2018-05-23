@@ -166,10 +166,20 @@ def callback():
                         TextSendMessage(text="既に正解が出てます。")
                     )
 
-            if next_action == 'word_guess_time_up':
-                real_insider = room['rounds_info'][-1]["insider"]
-                calculate_score_when_word_guess_timed_up(real_insider, room)
-                single_turn_guess_insider_when_time_is_up(room, room_id)
+            if next_action == 'word_guess_time_up' and latest_button:
+                if room['rounds_info'][-1]["answered"] is False:
+                    room['rounds_info'][-1]["answered"] = True
+                    real_insider = room['rounds_info'][-1]["insider"]
+                    calculate_score_when_word_guess_timed_up(real_insider, room)
+                    single_turn_guess_insider_when_time_is_up(room, room_id)
+                    with open('rooms.json', 'w') as room_json:
+                        json.dump(rooms_dict, room_json, indent=2)
+
+                else:
+                    line_bot_api.reply_message(
+                        event.reply_token,
+                        TextSendMessage(text="すでにインサイダー予想に移っています。")
+                    )
 
             if "insider_guess" in data_dict and "last_guess" not in data_dict:
                 current_round = room['rounds_info'][-1]

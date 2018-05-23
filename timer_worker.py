@@ -27,6 +27,7 @@ async def timer(delay):
             with open('rooms.json', 'r') as room_json:
                 rooms_dict = json.load(room_json)
                 answered = rooms_dict[room_id]["rounds_info"][-1]["answered"]
+                current_round_count = len(rooms_dict[room_id]["rounds_info"])
 
             print(f'\nroom_id{room_id} time_left:{time_left}')
             print(f'i:{i}, set_list_len:{len(r.zrange("timer", 0, -1, withscores=True))}')
@@ -64,7 +65,7 @@ async def timer(delay):
 
                         line_bot_api.push_message(
                             master,
-                            [get_confirm_button_moving_to_insider_guess(room_id)]
+                            [get_confirm_button_moving_to_insider_guess(room_id, current_round_count)]
                         )
 
             else:
@@ -73,7 +74,7 @@ async def timer(delay):
         await asyncio.sleep(delay)  # indent position is important
 
 
-def get_confirm_button_moving_to_insider_guess(room_id):
+def get_confirm_button_moving_to_insider_guess(room_id, current_round_count):
 
     confirm_template_message = TemplateSendMessage(
         alt_text='確認ボタンが表示されています。',
@@ -84,7 +85,7 @@ def get_confirm_button_moving_to_insider_guess(room_id):
                 PostbackTemplateAction(
                     label='確認',
                     text='確認',
-                    data=f'room_id={room_id}&next_action=word_guess_time_up'
+                    data=f'room_id={room_id}&nth_round={current_round_count}&next_action=word_guess_time_up'
                 )
             ]
         )
